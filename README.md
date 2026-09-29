@@ -56,9 +56,10 @@ Each copy keeps the game's own license files and credits, and the game list link
 **If one of these is your game and you'd like it removed, [open an issue](https://github.com/PeerInfinity/tmt-loader/issues)
 and I'll take it down.** No explanation needed.
 
-I plan to rework this so it stores no copies at all. The loader would load each game straight from its author's own
-repository, and authors could add the optional extras (mobile layout, automation tools) to their own game's page with a
-script tag. Feedback on that plan is welcome in the issues, including "please don't".
+I'm considering a few changes. One option is to rework this so it stores no copies at all: the loader would load
+each game straight from its author's own repository. I also plan to let authors add the optional extras (mobile
+layout, automation tools) to their own game's page with a script tag. Feedback on either is welcome in the issues,
+including "please don't".
 
 ## For developers
 
