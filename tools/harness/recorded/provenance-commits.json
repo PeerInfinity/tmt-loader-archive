@@ -1,0 +1,55 @@
+{
+  "about": "The loader commits that games-auto/*.json provenance records cite, frozen: `auto-tables.mjs --provenance` checks a record's commit against THIS list, never against git history (R12/R13 — the tree is imported without history). Add a commit with `node tools/auto-tables.mjs --add-commit <sha>` (it must be an ancestor of HEAD in the clone you run it in).",
+  "recorded": {
+    "from": "the loader history at 329ba9f3a; every commit an ancestor of it",
+    "by": "tools/harness/record-history.mjs provenance at 329ba9f3a (in tmt-loader-archive)",
+    "date": "2026-09-29"
+  },
+  "commits": {
+    "0e236daf0add75cfd5ef6fc6b2c66f32089353e4": {
+      "commit": "0e236daf0add75cfd5ef6fc6b2c66f32089353e4",
+      "date": "2026-09-20",
+      "subject": "feat(ladder): M23 and M24 reached — the rung, its fixtures, and the two marks that did not arrive (R3a part 2)"
+    },
+    "245ed3b2bbe841774552e787956797464ec151ea": {
+      "commit": "245ed3b2bbe841774552e787956797464ec151ea",
+      "date": "2026-09-15",
+      "subject": "gates-s1: part 2k — the generic kind order (reset last) vs the tables' reset-first order on the pinned marks at diff 1 (informative)"
+    },
+    "3842e441ad3c8ca5ee5227bc9622c07136da52f6": {
+      "commit": "3842e441ad3c8ca5ee5227bc9622c07136da52f6",
+      "date": "2026-09-20",
+      "subject": "feat(ptr): row 3's cycle ON in the table, and M25 \"Speed Demon\" landed with a fixture (R3b-2 parts 2 & 3)"
+    },
+    "3bc12bf77976cf60ba440664de1f421a29222e4f": {
+      "commit": "3bc12bf77976cf60ba440664de1f421a29222e4f",
+      "date": "2026-09-14",
+      "subject": "gates-a1: part 3 constants above the top-level run (TDZ); docs/automation.md: the two tables' measured defaults + harness levers"
+    },
+    "9a30dc31cef30eb777d5a74bde9184b51b257171": {
+      "commit": "9a30dc31cef30eb777d5a74bde9184b51b257171",
+      "date": "2026-09-17",
+      "subject": "feat(automation): R1′ part 1 — ptr `reset:p` = `gain>=2x`, a derived reserve, and a measurable exclusion"
+    },
+    "b695e4780e3f983d261c4516071f01d13752c873": {
+      "commit": "b695e4780e3f983d261c4516071f01d13752c873",
+      "date": "2026-09-14",
+      "subject": "A2 part 3: ptr row 2 — reset:t/e/s (interval>=5), upgrades:t/e/s, buyables:e/s (new policy `buy`: PTR's buyMax() is a free autobuyer path), rowTwoOrder s,t,e (measured); tools/harness/sweep.mjs; gates-a2 --part 3|3o|3s-*; docs"
+    },
+    "d30741b05c74b045702705f2fa099b537278bba0": {
+      "commit": "d30741b05c74b045702705f2fa099b537278bba0",
+      "date": "2026-09-20",
+      "subject": "feat(automation): `while`, `until` and `priority` — one predicate mechanism, two controls, on every kind (V4 parts 1, 2 and 4)"
+    },
+    "d656e5c9943cf4f91b2e7f957398b14b32066dfc": {
+      "commit": "d656e5c9943cf4f91b2e7f957398b14b32066dfc",
+      "date": "2026-09-19",
+      "subject": "fix(gates): the roster leg's console-error control never priced its own TICKS"
+    },
+    "d9b2ca177835d5c50d2ec02489f3a5dc761c0dd1": {
+      "commit": "d9b2ca177835d5c50d2ec02489f3a5dc761c0dd1",
+      "date": "2026-09-17",
+      "subject": "feat(harness): R1′ — a sharper M13, an order= lever, and gate R1′'s chain driver"
+    }
+  }
+}

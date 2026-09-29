@@ -5,6 +5,11 @@
 //   node tools/pristine.mjs --write <id>...       record games/<id>/ AS IT IS ON DISK — only while it is still upstream's
 //                                                 bytes, i.e. right after the import and BEFORE tools/media.mjs runs
 //                                                 (tools/add-game.mjs calls this at exactly that point)
+//   node tools/pristine.mjs --write <id> --from <dir>
+//                                                 record from a checkout of the upstream commit instead (a RE-PIN: after
+//                                                 a pull, games/<id>/ still holds the processed media of every file the
+//                                                 pull did not touch, so its disk is not upstream's tree). The commit
+//                                                 recorded is manifests/<id>.json's upstream.commit — update that first.
 //
 // ⚖ R12/R13 (user, 2026-09-29): the split imports a history-free tree, and nothing in the new repositories may need the
 // old one to exist. G4 used to find each game's `git-subtree` squash commit in the history and diff its tree against
@@ -122,8 +127,8 @@ export function recordText(rec) {
 }
 
 /** Records games/<id>/ from disk. The caller vouches that the directory is upstream's `commit`, byte for byte. */
-export function writeRecordFromDisk(id, commit, { root = ROOT, gamesDir = path.join(root, 'games'), from, date = new Date().toISOString().slice(0, 10) } = {}) {
-  const files = listDisk(path.join(gamesDir, id));
+export function writeRecordFromDisk(id, commit, { root = ROOT, gamesDir = path.join(root, 'games'), dirName = id, from, date = new Date().toISOString().slice(0, 10) } = {}) {
+  const files = listDisk(path.join(gamesDir, dirName));
   const rec = { id, upstream: { commit, tree: treeIdOf(files) }, recorded: { from: from || `games/${id}/ on disk right after its import, before tools/media.mjs (tools/pristine.mjs --write)`, date } };
   fs.mkdirSync(path.join(root, PRISTINE_DIR), { recursive: true });
   fs.writeFileSync(recordPath(id, root), recordText({ ...rec, files }));
@@ -132,15 +137,20 @@ export function writeRecordFromDisk(id, commit, { root = ROOT, gamesDir = path.j
 
 async function main() {
   const argv = process.argv.slice(2);
+  let from = null;
+  const fi = argv.indexOf('--from');
+  if (fi >= 0) { from = argv[fi + 1]; argv.splice(fi, 2); if (!from || from.startsWith('--')) { console.error('--from needs a directory'); return 2; } }
   const flags = argv.filter((x) => x.startsWith('--')), ids0 = argv.filter((x) => !x.startsWith('--'));
   const unknown = flags.filter((f) => !['--check', '--write'].includes(f));
-  if (unknown.length || flags.length !== 1) { console.error('usage: node tools/pristine.mjs --check [<id>...] | --write <id>...'); return 2; }
+  if (unknown.length || flags.length !== 1 || (from && (flags[0] !== '--write' || ids0.length !== 1))) { console.error('usage: node tools/pristine.mjs --check [<id>...] | --write <id>... | --write <id> --from <upstream checkout>'); return 2; }
   const roster = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifests/index.json'), 'utf8')).map((g) => g.id);
   if (flags[0] === '--write') {
     if (!ids0.length) { console.error('--write needs the ids to record'); return 2; }
     for (const id of ids0) {
       const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifests', `${id}.json`), 'utf8'));
-      const r = writeRecordFromDisk(id, m.upstream.commit);
+      const r = from
+        ? writeRecordFromDisk(id, m.upstream.commit, { gamesDir: path.dirname(path.resolve(from)), dirName: path.basename(path.resolve(from)), from: `a checkout of upstream ${m.upstream.commit} (tools/pristine.mjs --write --from)` })
+        : writeRecordFromDisk(id, m.upstream.commit);
       console.log(`recorded ${PRISTINE_DIR}/${id}.json: upstream ${r.upstream.commit.slice(0, 9)}, tree ${r.upstream.tree}`);
     }
     return 0;

@@ -1,8 +1,8 @@
 // Gate G4b: the manifest is a PIN, games/<id>/index.html is the source. Parses the live index with
 // loader/interpret.mjs and fails on drift from manifest.load.scripts / modFiles / modFilesPrefix / external; also
 // checks the vendored files' sha256, that renderOnly ⊆ scripts, and that games/<id>/ is PRISTINE at the upstream
-// commit (its tree equals the subtree squash commit's tree, and that squash names manifest.upstream.commit) — up to
-// the media exception: processed images and audio, modified in place (docs/add-a-game.md; tools/media.mjs).
+// commit (its files equal the recorded upstream listing games-pristine/<id>.json, which names manifest.upstream.commit;
+// tools/pristine.mjs — read from the files, never from git history) — up to the media exception: processed images and audio, modified in place (docs/add-a-game.md; tools/media.mjs).
 // load.known (L2b, hand-kept): the declared allowances must EQUAL what the tree contains — missingScripts = the
 // index-named local scripts (static and modFiles) absent under games/<id>/; missingAssets = the index-named local
 // assets (a relative `src`/`href` in the entry document whose path ends in an asset extension) absent under
@@ -17,8 +17,8 @@ import { REPO, GAMES, parseArgs, readManifest, sha256hex, writeJSON } from './li
 import { runNode } from './run.mjs';
 import { classify } from '../media-lib.mjs';
 import { checkMedia } from '../media.mjs';
+import { readRecord, recordProblems, listDisk, treeIdOf, diffListings, PRISTINE_DIR } from '../pristine.mjs';
 
-const git = (...a) => execFileSync('git', ['-C', REPO, ...a], { encoding: 'utf8' }).trim();
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sorted = (a) => [...new Set(a)].sort();
 
@@ -94,8 +94,8 @@ export function checkManifest(id, { boot = true } = {}) {
   const { slot } = executionOrder(plan);
 
   // scripts: the pin lists loader.js where the plan has the slot
-  const live = scriptNames(plan).map((s) => (s === '<modFiles>' ? slot.loader : s));
-  if (!same(live, m.load.scripts)) problems.push({ field: 'load.scripts', manifest: m.load.scripts, live });
+  const liveScripts = scriptNames(plan).map((s) => (s === '<modFiles>' ? slot.loader : s));
+  if (!same(liveScripts, m.load.scripts)) problems.push({ field: 'load.scripts', manifest: m.load.scripts, live: liveScripts });
   const liveExternal = {};
   for (const s of plan.scripts) if (s.vendor) liveExternal[s.vendor.url] = 'vendor';
   for (const l of plan.links) if (l.external) liveExternal[l.external] = l.verdict;
@@ -147,30 +147,34 @@ export function checkManifest(id, { boot = true } = {}) {
     if (!same(declared, tree[k])) problems.push({ field: `load.known.${k}`, drift: true, manifest: declared, live: tree[k], declaredNotInTree: declared.filter((x) => !tree[k].includes(x)), inTreeNotDeclared: tree[k].filter((x) => !declared.includes(x)), ...(k === 'externalHosts' ? { files: tree.hostFiles } : {}) });
   }
 
-  // pristine: games/<id>/ tree == the subtree squash commit's tree; the squash names the upstream commit
-  const squash = git('log', '--format=%H%x09%b', `--grep=^git-subtree-dir: games/${id}$`, '-n', '1');
-  const split = (squash.match(/git-subtree-split: ([0-9a-f]{40})/) || [])[1] || null;
-  const squashSha = squash.split('\t')[0] || null;
-  const treeNow = git('rev-parse', `HEAD:games/${id}`);
-  // the squash commit itself holds the upstream tree at its root
-  const squashCommit = git('log', '--format=%H', `--grep=^Squashed 'games/${id}/' content from commit`, '-n', '1');
-  const treeSquash = squashCommit ? git('rev-parse', `${squashCommit}^{tree}`) : null;
-  if (split !== m.upstream.commit) problems.push({ field: 'upstream.commit', manifest: m.upstream.commit, subtreeSplit: split });
-  // ⚖ the media exception (user, 2026-09-22; docs/add-a-game.md): the tree may differ from the squash in MEDIA FILES
+  // pristine: games/<id>/ ON DISK == the recorded upstream listing (games-pristine/<id>.json), which names the upstream
+  // commit. ⚖ R12/R13 (2026-09-29): this used to read the git-subtree squash commit out of the HISTORY and diff its tree
+  // against `HEAD:games/<id>`; a history-free import has no squash, and through a submodule `HEAD:games/<id>` does not
+  // resolve. The record holds what the squash held (every file's blob id, and the tree id it hashes to), and the tree is
+  // read from the FILES — no git object is ever looked up, so both layouts (games/ a directory of this repo, or a
+  // submodule) read the same. S1T's equivalence: this verdict equals the squash-based one on all 175 games.
+  const rec = readRecord(id, REPO);
+  const recProblems = recordProblems(id, rec);
+  const live = fs.existsSync(root) ? listDisk(root) : {};
+  const treeNow = Object.keys(live).length ? treeIdOf(live) : null;
+  const upstreamCommit = rec?.upstream?.commit ?? null;
+  if (recProblems.length) problems.push({ field: 'games pristine (record)', record: `${PRISTINE_DIR}/${id}.json`, errors: recProblems.slice(0, 20) });
+  else if (upstreamCommit !== m.upstream.commit) problems.push({ field: 'upstream.commit', manifest: m.upstream.commit, recorded: upstreamCommit });
+  // ⚖ the media exception (user, 2026-09-22; docs/add-a-game.md): the tree may differ from upstream's in MEDIA FILES
   // ONLY — each a modification in place (same path; nothing added, deleted or renamed) of an in-scope image or audio
   // file that is now processed. Anything else — one byte of code, markup or a licence — is still `games pristine`.
   let media = null;
-  if (treeNow !== treeSquash && treeSquash) {
-    const d = execFileSync('git', ['-C', REPO, 'diff-tree', '-r', '--no-renames', '--name-status', '-z', treeSquash, treeNow], { encoding: 'utf8', maxBuffer: 64 << 20 }).split('\0').filter(Boolean);
-    const changed = [];
-    for (let i = 0; i + 1 < d.length; i += 2) changed.push({ status: d[i], rel: d[i + 1] });
+  if (!recProblems.length && treeNow !== rec.upstream.tree) {
+    const changed = diffListings(rec.files, live);
     const notMedia = changed.filter((c) => c.status !== 'M' || !classify(c.rel));
-    const mc = checkMedia([id]);
-    if (notMedia.length) problems.push({ field: 'games pristine', treeNow, treeSquash, notMedia: notMedia.slice(0, 20) });
-    else if (!mc.ok) problems.push({ field: 'games pristine (media)', raw: mc.problems.slice(0, 20) });
+    if (notMedia.length) problems.push({ field: 'games pristine', treeNow, treeUpstream: rec.upstream.tree, notMedia: notMedia.slice(0, 20) });
+    else { const mc = checkMedia([id]); if (!mc.ok) problems.push({ field: 'games pristine (media)', raw: mc.problems.slice(0, 20) }); }
     media = changed.length;
-  } else if (treeNow !== treeSquash) problems.push({ field: 'games pristine', treeNow, treeSquash });
-  const dirty = execFileSync('git', ['-C', REPO, 'status', '--porcelain', '--', `games/${id}`], { encoding: 'utf8' }).trim();
+  }
+  // the working tree against its own commit — in whichever repository holds games/ (`git -C games`: the outer repo while
+  // games/ is a directory, the submodule once it is one). Skipped, and said so, where there is no git at all.
+  let dirty = null;
+  try { dirty = execFileSync('git', ['-C', path.join(REPO, 'games'), 'status', '--porcelain', '--', id], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { dirty = null; }
   if (dirty) problems.push({ field: 'games pristine (working tree)', dirty });
   // headless.idleHash.census — RETIRED with Q6 (2026-09-22). It recorded the census's hash beside ours where the two
   // disagreed; its one instance (the-collab-tree-lun4-r, `cheese.cycle`) was the census boot pre-clearing
@@ -185,7 +189,7 @@ export function checkManifest(id, { boot = true } = {}) {
     else if (!fs.existsSync(path.join(REPO, m.auto))) problems.push({ field: 'auto', error: 'file missing', live: m.auto });
   }
 
-  return { id, ok: problems.length === 0, known: known ?? null, knownTree: { missingScripts: tree.missingScripts, missingAssets: tree.missingAssets, externalHosts: tree.externalHosts }, mediaFiles: media, scripts: live.length, modFiles: modFiles && modFiles.length, external: liveExternal, vendor, subtreeSplit: split, tree: treeNow, problems };
+  return { id, ok: problems.length === 0, known: known ?? null, knownTree: { missingScripts: tree.missingScripts, missingAssets: tree.missingAssets, externalHosts: tree.externalHosts }, mediaFiles: media, scripts: liveScripts.length, modFiles: modFiles && modFiles.length, external: liveExternal, vendor, upstreamCommit, tree: treeNow, gitStatus: dirty === null ? 'no git' : 'read', problems };
 }
 
 async function main() {

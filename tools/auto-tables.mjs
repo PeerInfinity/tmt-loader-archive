@@ -11,10 +11,17 @@
 //                 `id` is its file name. No git history needed: the fast CI job runs this.
 //   --write       regenerate the schema file from the loader (after changing TABLE_SCHEMA).
 //   --provenance  THE PROVENANCE GATE: every `policies` / `gates` / `keep` entry, and every `unlockOrder` list, has a
-//                 provenance record; every measured record's `commit` is an ancestor of HEAD and its `gate` appears in
+//                 provenance record; every measured record's `commit` is in the FROZEN COMMIT LIST
+//                 (`tools/harness/recorded/provenance-commits.json`) and its `gate` appears in
 //                 `tools/harness/results/SUMMARY.md` (a row whose first cell begins with the id) — or the record
 //                 names the CI `run` whose job output holds the rows, for a gate that writes none to SUMMARY. Records
-//                 marked `unverified` are LISTED, never failed and never given an invented gate id. Needs history.
+//                 marked `unverified` are LISTED, never failed and never given an invented gate id. Reads no git.
+//   --add-commit <sha>  add a loader commit to the frozen list (sha, date, subject), for a NEW record that cites it.
+//                 Run in a clone that has the commit: it must be an ancestor of HEAD there. The only git this tool asks.
+// ⚖ R12/R13 (user, 2026-09-29): this gate asked `git merge-base --is-ancestor` of every record's commit, so it needed
+// the full history — and after the split the cited commits exist only in tmt-loader-archive, which nothing in the new
+// repositories may need. The 9 commits the 16 records cited were FROZEN once, from the history (sha, date, subject);
+// the gate checks membership in that list, and a new record's commit is added with --add-commit when it is written.
 // ⛔ EVERY FLAG IS DECLARED; an unknown one is a hard error.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILE = path.join(REPO, 'schemas/games-auto.schema.json');
 const BOOL = new Set(['check', 'write', 'provenance', 'help']);
-const VALUED = new Set(['json', 'repo']);
+const VALUED = new Set(['json', 'repo', 'add-commit']);
 
 export function parseStrict(argv) {
   const o = {};
@@ -87,12 +94,29 @@ export function summaryLabels(root = REPO) {
   return t.split('\n').filter((l) => l.startsWith('| ')).map((l) => l.split('|')[1].trim());
 }
 export function gateInSummary(gate, labels) { return labels.some((l) => l === gate || l.startsWith(gate + ' ') || l.startsWith(gate + ':')); }
-function isAncestor(commit, root) {
-  try { execFileSync('git', ['-C', root, 'merge-base', '--is-ancestor', commit, 'HEAD'], { stdio: 'ignore' }); return true; } catch { return false; }
+export const COMMITS_FILE = 'tools/harness/recorded/provenance-commits.json';
+/** The frozen commit list: {<sha as cited>: {commit, date, subject}}. */
+export function frozenCommits(root = REPO) {
+  const f = path.join(root, COMMITS_FILE);
+  return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).commits || {} : {};
+}
+/** Adds `sha` to the frozen list — resolved and ancestor-checked in THIS clone (the one place git is asked). */
+function addCommit(sha, root) {
+  const git = (...x) => execFileSync('git', ['-C', root, ...x], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const full = git('rev-parse', '--verify', `${sha}^{commit}`);
+  try { git('merge-base', '--is-ancestor', full, 'HEAD'); } catch { throw new Error(`${sha} is not an ancestor of HEAD in ${root}`); }
+  const [date, subject] = git('log', '-1', '--format=%cs%x09%s', full).split('\t');
+  const f = path.join(root, COMMITS_FILE);
+  const doc = JSON.parse(fs.readFileSync(f, 'utf8'));
+  doc.commits[sha] = { commit: full, date, subject };
+  doc.commits = Object.fromEntries(Object.entries(doc.commits).sort(([x], [y]) => (x < y ? -1 : 1)));
+  fs.writeFileSync(f, JSON.stringify(doc, null, 2) + '\n');
+  return doc.commits[sha];
 }
 
-/** The provenance gate over one parsed table: {missing, bad, unverified, records}. `ancestor` is injectable for tests. */
-export function checkProvenance(table, { labels, ancestor }) {
+/** The provenance gate over one parsed table: {missing, bad, unverified, records}. `known` (is this commit in the frozen
+ *  list) is injectable for tests. */
+export function checkProvenance(table, { labels, known }) {
   const prov = table.provenance || {};
   const need = new Set([...Object.keys(table.policies || {}), ...Object.keys(table.gates || {}), ...Object.keys(table.keep || {})]);
   (table.unlockOrder || []).forEach((_, i) => need.add(`unlockOrder:${i}`));
@@ -103,7 +127,7 @@ export function checkProvenance(table, { labels, ancestor }) {
     for (const r of [].concat(v)) {
       records++;
       if (r.unverified) { unverified.push(`${k}: ${r.note}`); continue; }
-      if (!ancestor(r.commit)) bad.push(`${k}: commit ${r.commit} is not an ancestor of HEAD`);
+      if (!known(r.commit)) bad.push(`${k}: commit ${r.commit} is not in the frozen commit list ${COMMITS_FILE} (add it with --add-commit)`);
       if (!r.run && !gateInSummary(r.gate, labels)) bad.push(`${k}: gate ${JSON.stringify(r.gate)} appears in no results/SUMMARY.md row (and the record names no CI run)`);
     }
   }
@@ -119,10 +143,15 @@ async function main() {
     fs.writeFileSync(path.join(root, 'schemas/games-auto.schema.json'), schemaText(loadSchemaBlock(root).TABLE_SCHEMA));
     console.log('wrote schemas/games-auto.schema.json');
   }
+  if (A['add-commit']) { const e = addCommit(A['add-commit'], root); console.log(`added ${A['add-commit']} to ${COMMITS_FILE}: ${e.date} ${e.subject}`); return 0; }
   const out = {};
   if (A.provenance) {
     const labels = summaryLabels(root);
-    const res = tableFiles(root).map((f) => ({ file: f, ...checkProvenance(JSON.parse(fs.readFileSync(path.join(root, 'games-auto', f), 'utf8')), { labels, ancestor: (c) => isAncestor(c, root) }) }));
+    const frozen = frozenCommits(root);
+    // an entry must name the commit it is keyed by (a hand edit that re-keys one is a RED, not a silent pass)
+    const badList = Object.entries(frozen).filter(([k, e]) => !e || typeof e.commit !== 'string' || !e.commit.startsWith(k) || !/^[0-9a-f]{40}$/.test(e.commit));
+    for (const [k] of badList) console.log(`RED   ${COMMITS_FILE}: the entry ${k} does not name a 40-hex commit that begins with its key`);
+    const res = tableFiles(root).map((f) => ({ file: f, ...checkProvenance(JSON.parse(fs.readFileSync(path.join(root, 'games-auto', f), 'utf8')), { labels, known: (c) => Object.hasOwn(frozen, c) && !badList.some(([k]) => k === c) }) }));
     let red = 0;
     for (const r of res) {
       const ok = !r.missing.length && !r.bad.length;
@@ -130,6 +159,7 @@ async function main() {
       console.log(`${ok ? 'GREEN' : 'RED  '} ${r.file}: ${r.records} records; missing ${r.missing.length ? r.missing.join(', ') : 'none'}; bad ${r.bad.length ? r.bad.join(' | ') : 'none'}; unverified ${r.unverified.length}`);
       for (const u of r.unverified) console.log(`      UNVERIFIED ${r.file} ${u}`);
     }
+    red += badList.length;
     console.log(`AUTO-TABLES PROVENANCE — ${res.length} tables, ${red} RED`);
     out.provenance = res;
     if (A.json) fs.writeFileSync(A.json, JSON.stringify(out, null, 1) + '\n');

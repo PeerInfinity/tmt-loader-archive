@@ -88,7 +88,7 @@ try {
       const countsOk = live.counts.ms === cen.milestones && live.counts.upg === cen.upgrades && live.counts.buy === cen.buyables && live.counts.ch === cen.challenges && live.counts.ach === cen.achievements;
       row({ gate: 'G4 goldens', id, ok: c.ok && countsOk, ticks: 0, gameSeconds: 0, diff: null, hash: null, notes: `${live.ids.length} ids, ${Object.keys(live.layers).length} layers; ms ${live.counts.ms} / upg ${live.counts.upg} / buy ${live.counts.buy} / ch ${live.counts.ch} / ach ${live.counts.ach} (census equal=${countsOk})` });
       const cm = checkManifest(id);
-      row({ gate: 'G4 check-manifest', id, ok: cm.ok, ticks: 0, gameSeconds: 0, diff: null, hash: null, notes: cm.ok ? `${cm.scripts} scripts, ${cm.modFiles} modFiles, vendor sha256 ok, subtree split ${cm.subtreeSplit.slice(0, 7)}, games/${id} pristine${cm.mediaFiles ? ` up to ${cm.mediaFiles} processed media files` : ''}` : JSON.stringify(cm.problems).slice(0, 300) });
+      row({ gate: 'G4 check-manifest', id, ok: cm.ok, ticks: 0, gameSeconds: 0, diff: null, hash: null, notes: cm.ok ? `${cm.scripts} scripts, ${cm.modFiles} modFiles, vendor sha256 ok, upstream ${cm.upstreamCommit.slice(0, 7)}, games/${id} pristine${cm.mediaFiles ? ` up to ${cm.mediaFiles} processed media files` : ''}` : JSON.stringify(cm.problems).slice(0, 300) });
     }
   }
   // G6 — repo-wide, and only meaningful over the WHOLE roster, so it does not run for a subset of ids.
