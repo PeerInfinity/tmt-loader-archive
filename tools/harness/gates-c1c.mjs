@@ -30,7 +30,7 @@ entryOnly(import.meta.url);
 
 // ⛔ EVERY FLAG THIS FILE READS IS DECLARED, and the booleans are booleans (an undeclared flag takes the NEXT token).
 const a = parseArgs(process.argv.slice(2), ['no-summary', 'no-write', 'assert']);
-const KNOWN = new Set(['_', 'part', 'pool', 'repeat', 'before-root', 'no-summary', 'no-write', 'assert']);
+const KNOWN = new Set(['_', 'part', 'pool', 'repeat', 'before-root', 'no-summary', 'no-write', 'assert', 'record']);
 for (const k of Object.keys(a)) if (!KNOWN.has(k)) { console.error(`REFUSED: unknown flag --${k}`); process.exit(2); }
 const PART = String(a.part || '1');
 const POOL = Number(a.pool || 4), REPEAT = Number(a.repeat || 2);
@@ -43,6 +43,12 @@ const ROWS = { 1: 6, 2: 15, 3: 4, 4: 12 };
 
 /** The commit BEFORE C1c — main at the brief's writing (`tmt-auto-21`), the last with `numIds` and the `Decimal` helper. */
 const BEFORE = '4d8ee5a69';
+// S1T (R12/R13) RECORDER, one-time: `--record <file>` writes what each BEFORE run produced (the fields the rows read),
+// merged with what is already there. Removed in the next commit; kept in the archive's history as the regenerator.
+const RECORD = a.record ? {} : null;
+const projectBefore = (b) => ({ ok: b.ok, ...(b.error ? { error: b.error } : {}), ticks: b.ticks, gameSeconds: b.gameSeconds, hashGame: b.hashGame,
+  marks: b.marks ? Object.fromEntries(Object.entries(b.marks).map(([k, m]) => [k, m ? { gameSeconds: m.gameSeconds } : null])) : {},
+  eval: b.eval ?? null, hook: { actions: b.hook?.actions ?? {} }, wallMs: b.wallMs });
 
 function child(args, { cwd = REPO, timeoutMs = 600e3 } = {}) {
   return new Promise((resolve) => {
@@ -173,6 +179,7 @@ async function part2() {
   const actions = (r) => Object.entries(r.hook?.actions || {}).sort().map(([k, v]) => `${k} ${v}`).join(', ') || 'none';
   for (const kind of ['fresh', 'lifted']) for (const id of P2) {
     const af = out.filter((x) => x.id === id && x.kind === kind && x.side === 'after').map((x) => x.r), bf = out.find((x) => x.id === id && x.kind === kind && x.side === 'before').r;
+    if (RECORD) RECORD[`part2:${kind}:${id}`] = projectBefore(bf);
     const H = kind === 'fresh' ? HORIZON : LIFT_TICKS;
     const A = af[0], twice = af.every((r) => agree(r, A));
     const ev = (r) => (r.eval && r.eval.events != null ? r.eval.events : null);
@@ -203,6 +210,7 @@ async function part3() {
   const out = await pool(jobs, Math.min(POOL, 3), async (j) => ({ ...j, r: await runAt(j.side === 'after' ? REPO : root, j.L.id, j.L.flags) }));
   for (const L of LEGS) {
     const af = out.filter((x) => x.L === L && x.side === 'after').map((x) => x.r), bf = out.find((x) => x.L === L && x.side === 'before').r;
+    if (RECORD) RECORD[`part3:${L.key}`] = projectBefore(bf);
     const A = af[0], twice = af.every((r) => agree(r, A)), same = agree(A, bf);
     const ms = markSec(A);
     const pinOk = !L.pin || (ms[L.pin.mark] === L.pin.gs && A.hashGame === L.pin.hashGame);
@@ -245,6 +253,11 @@ async function part4() {
 const PARTS = { 1: part1, 2: part2, 3: part3, 4: part4 };
 if (!PARTS[PART]) { console.error(`no part ${PART}`); process.exit(2); }
 try { await PARTS[PART](); } finally { dropControl(); }
+if (RECORD) {
+  const prev = fs.existsSync(a.record) ? JSON.parse(fs.readFileSync(a.record, 'utf8')) : {};
+  fs.writeFileSync(a.record, JSON.stringify({ ...prev, ...RECORD }, null, 1) + '\n');
+  console.log(`recorded ${Object.keys(RECORD).length} BEFORE result(s) → ${a.record}`);
+}
 const red = rows.filter((r) => !r.ok).length;
 const verdict = `C1c part ${PART}: rows ${rows.length}/${ROWS[PART]} expected, ${red} RED`;
 console.log(`\nVERDICT: ${verdict}`);

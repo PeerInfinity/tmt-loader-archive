@@ -76,6 +76,14 @@ const PINS = [
 ];
 
 const a = parseArgs(process.argv.slice(2), ['no-summary']);
+// S1T (R12/R13) RECORDER, one-time: `--record <file>` writes what each baseline run produced (the fields the rows read)
+// into <file>, merged with what is already there, so the gate can later compare against the recording instead of
+// re-running the commit. Removed in the next commit; kept in the archive's history as the regenerator.
+const RECORD = a.record ? {} : null;
+const projectBase = (b) => ({ ok: b.ok, ...(b.error ? { error: b.error } : {}), ticks: b.ticks, gameSeconds: b.gameSeconds, hash: b.hash, hashGame: b.hashGame,
+  marks: b.marks ? Object.fromEntries(Object.entries(b.marks).map(([n, m]) => [n, m ? { ticks: m.ticks, gameSeconds: m.gameSeconds, hash: m.hash, hashGame: m.hashGame } : null])) : null,
+  stall: b.stall ? { stalled: b.stall.stalled, walled: b.stall.walled, lastProgress: b.stall.lastProgress ? { ticks: b.stall.lastProgress.ticks } : null } : null,
+  featureStates: b.featureStates ?? null });
 const PART = String(a.part || '1');
 const commit = headCommit(), dirty = treeDirty();
 const date = new Date().toISOString().slice(0, 19) + 'Z';
@@ -204,6 +212,7 @@ async function part1(browser, base) {
 async function pinnedRows(runs) {
   for (const { p, s1, base: bp } of runs) {
     const [r, b] = await Promise.all([s1, bp]);
+    if (RECORD) RECORD[p.key] = projectBase(b);
     if (p.want) {
       MARKS[p.marks].forEach(([n], i) => {
         const [wt, wh] = p.want[i];
@@ -245,6 +254,7 @@ async function part1rest(browser, base, fresh, omega) {
   // fresh boot: each old feature's Locked state (unlocked()) vs the derived feature of the same id; the new ids listed
   for (const { id, s1, old } of fresh) {
     const [r, o] = await Promise.all([s1, old]);
+    if (RECORD) RECORD[`fresh:${id}`] = projectBase(o);
     const now = Object.fromEntries((r.featureStates || []).map(([fid, u, pol]) => [fid, [u, pol]]));
     const diffs = [], same = [], intended = [];
     for (const [fid, u, pol] of o.featureStates || []) {
@@ -452,6 +462,11 @@ try {
   await browser.close();
   server.stop();
   removeTrees();
+  if (RECORD) {
+    const prev = fs.existsSync(a.record) ? JSON.parse(fs.readFileSync(a.record, 'utf8')) : {};
+    fs.writeFileSync(a.record, JSON.stringify({ ...prev, ...RECORD }, null, 1) + '\n');
+    console.log(`recorded ${Object.keys(RECORD).length} baseline result(s) → ${a.record}`);
+  }
 }
 
 const SUMMARY = path.join(REPO, 'tools/harness/results/SUMMARY.md');
