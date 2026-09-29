@@ -1,0 +1,462 @@
+{
+ "about": "A RECORDING of the BEFORE side of C1c parts 2 and 3: the commit before C1c (main at `tmt-auto-21`, the last with `numIds` and the `Decimal` helper), run in a control worktree. tools/harness/gates-c1c.mjs compares HEAD against these results instead of re-running the old commit — ⚖ R12/R13 (user, 2026-09-29): the split imports a tree with no history, and nothing in it may need the old repository. The fields are exactly the ones the gate's rows read. See the gate's header for what comparing against a recording changes.",
+ "recorded": {
+  "from": "commit(s) 4d8ee5a69 of the loader history, each run from a worktree, with no wall",
+  "by": "node tools/harness/gates-c1c.mjs --part 3 --no-summary --no-write --record <file>, then --part 2 the same at fb45e525f (in tmt-loader-archive)",
+  "date": "2026-09-29",
+  "deterministic": "every result recorded twice, in two separate runs; the two recordings are equal field for field (wallMs, the informational wall clock, aside)"
+ },
+ "results": {
+  "part2:fresh:collection-of-everything": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "38b7d3ce58fbc6bc",
+   "marks": {},
+   "eval": {
+    "events": 20,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "reset:w": 3600,
+     "upgrades:s": 4,
+     "reset:bam": 719,
+     "reset:mush": 24,
+     "reset:switch": 704,
+     "upgrades:bam": 2
+    }
+   },
+   "wallMs": 15810
+  },
+  "part2:fresh:the-collab-tree-lun4-r": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "1905af3670a35063",
+   "marks": {},
+   "eval": {
+    "events": 11,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "reset:tb": 62,
+     "upgrades:tb": 20,
+     "reset:cv": 35,
+     "upgrades:cv": 15,
+     "reset:tdr": 5
+    }
+   },
+   "wallMs": 16990
+  },
+  "part2:fresh:the-factoree": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "d376ef52da5d0ba1",
+   "marks": {},
+   "eval": {
+    "events": 4,
+    "word": {},
+    "f13": "0"
+   },
+   "hook": {
+    "actions": {
+     "reset:e": 18,
+     "upgrades:e": 4
+    }
+   },
+   "wallMs": 39264
+  },
+  "part2:fresh:the-gaming-tree": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "3ed19bc1e9b17310",
+   "marks": {},
+   "eval": {
+    "events": 2,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "upgrades:a": 1
+    }
+   },
+   "wallMs": 164781
+  },
+  "part2:fresh:the-hyperoperator-tree": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "9e59d7bf6f148a88",
+   "marks": {},
+   "eval": {
+    "events": 0,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {}
+   },
+   "wallMs": 26591
+  },
+  "part2:fresh:universal-reconstruction": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "5ac2c12a0fa6cfc3",
+   "marks": {},
+   "eval": {
+    "events": 1464,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "buyables:skyrmion": 40430,
+     "reset:skyrmion": 15,
+     "upgrades:skyrmion": 13,
+     "buyables:fome": 1441,
+     "reset:acceleron": 31,
+     "upgrades:acceleron": 4
+    }
+   },
+   "wallMs": 54610
+  },
+  "part2:fresh:yet-another-challenge-tree-adventure": {
+   "ok": true,
+   "ticks": 3600,
+   "gameSeconds": 3600,
+   "hashGame": "7a0249f53b35e7b0",
+   "marks": {},
+   "eval": {
+    "events": 0,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {}
+   },
+   "wallMs": 14539
+  },
+  "part2:lifted:collection-of-everything": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "d19a650de15b8e32",
+   "marks": {},
+   "eval": {
+    "events": 14,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "reset:w": 600,
+     "upgrades:s": 2,
+     "reset:bam": 122,
+     "reset:mush": 4,
+     "reset:switch": 109,
+     "upgrades:bam": 1
+    }
+   },
+   "wallMs": 3393
+  },
+  "part2:lifted:the-collab-tree-lun4-r": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "ff27a87f013e7225",
+   "marks": {},
+   "eval": {
+    "events": 9,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "reset:tb": 18,
+     "upgrades:tb": 6,
+     "reset:cv": 8,
+     "upgrades:cv": 4,
+     "reset:tdr": 2
+    }
+   },
+   "wallMs": 3990
+  },
+  "part2:lifted:the-factoree": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "a00666535360e895",
+   "marks": {},
+   "eval": {
+    "events": 26,
+    "word": {},
+    "f13": "3"
+   },
+   "hook": {
+    "actions": {
+     "reset:e": 67,
+     "buyables:f": 13,
+     "upgrades:e": 9,
+     "reset:f": 99,
+     "upgrades:f": 4
+    }
+   },
+   "wallMs": 10121
+  },
+  "part2:lifted:the-gaming-tree": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "29f5c097a748df04",
+   "marks": {},
+   "eval": {
+    "events": 2,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "upgrades:a": 1
+    }
+   },
+   "wallMs": 32250
+  },
+  "part2:lifted:the-hyperoperator-tree": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "5b13b981feee6c64",
+   "marks": {},
+   "eval": {
+    "events": 14,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "upgrades:m": 1,
+     "upgrades:a": 10,
+     "upgrades:s": 3
+    }
+   },
+   "wallMs": 7309
+  },
+  "part2:lifted:universal-reconstruction": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "83d9612e041884d9",
+   "marks": {},
+   "eval": {
+    "events": 740,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {
+     "upgrades:timecube": 6,
+     "buyables:skyrmion": 21240,
+     "reset:skyrmion": 3,
+     "upgrades:skyrmion": 13,
+     "buyables:fome": 1090,
+     "reset:acceleron": 15,
+     "upgrades:acceleron": 4
+    }
+   },
+   "wallMs": 18188
+  },
+  "part2:lifted:yet-another-challenge-tree-adventure": {
+   "ok": true,
+   "ticks": 600,
+   "gameSeconds": 600,
+   "hashGame": "6e9da87f014f2bd7",
+   "marks": {},
+   "eval": {
+    "events": 0,
+    "word": {},
+    "f13": null
+   },
+   "hook": {
+    "actions": {}
+   },
+   "wallMs": 2933
+  },
+  "part3:L": {
+   "ok": true,
+   "ticks": 28260,
+   "gameSeconds": 28260,
+   "hashGame": "dee581e710a1bf53",
+   "marks": {
+    "M16": {
+     "gameSeconds": 9157
+    },
+    "M17": {
+     "gameSeconds": 15919
+    },
+    "M18": {
+     "gameSeconds": 18105
+    },
+    "M19": {
+     "gameSeconds": 18450
+    },
+    "M20": {
+     "gameSeconds": 19137
+    },
+    "M21": {
+     "gameSeconds": 20598
+    },
+    "M22": {
+     "gameSeconds": 23262
+    },
+    "M23": {
+     "gameSeconds": 23328
+    },
+    "M24": {
+     "gameSeconds": 23381
+    },
+    "M25": {
+     "gameSeconds": 28260
+    }
+   },
+   "eval": null,
+   "hook": {
+    "actions": {
+     "reset:p": 639,
+     "upgrades:p": 527,
+     "reset:g": 284,
+     "upgrades:g": 90,
+     "reset:b": 567,
+     "upgrades:b": 132,
+     "reset:s": 92,
+     "buyables:s": 138,
+     "upgrades:s": 20,
+     "toggles:s": 1,
+     "reset:t": 102,
+     "buyables:t": 42,
+     "upgrades:t": 19,
+     "toggles:t": 1,
+     "reset:e": 199,
+     "upgrades:e": 15,
+     "buyables:e": 70,
+     "reset:sb": 25,
+     "reset:q": 145,
+     "buyables:q": 4,
+     "toggles:q": 5,
+     "reset:h": 15,
+     "challenges:h": 18,
+     "upgrades:q": 4
+    }
+   },
+   "wallMs": 439836
+  },
+  "part3:O": {
+   "ok": true,
+   "ticks": 6862,
+   "gameSeconds": 6862,
+   "hashGame": "cf8df88462606277",
+   "marks": {
+    "M01": {
+     "gameSeconds": 1
+    },
+    "M02": {
+     "gameSeconds": 918
+    },
+    "M03": {
+     "gameSeconds": 1627
+    },
+    "M04": {
+     "gameSeconds": 1850
+    },
+    "M05": {
+     "gameSeconds": 2119
+    },
+    "M06": {
+     "gameSeconds": 2637
+    },
+    "M07": {
+     "gameSeconds": 2663
+    },
+    "M08": {
+     "gameSeconds": 4712
+    },
+    "M09": {
+     "gameSeconds": 6451
+    },
+    "M10": {
+     "gameSeconds": 5939
+    },
+    "M11": {
+     "gameSeconds": 6815
+    },
+    "M12": {
+     "gameSeconds": 6862
+    }
+   },
+   "eval": null,
+   "hook": {
+    "actions": {
+     "reset:p": 584,
+     "upgrades:p": 509,
+     "reset:g": 284,
+     "upgrades:g": 90,
+     "reset:b": 567,
+     "upgrades:b": 120,
+     "reset:s": 17,
+     "buyables:s": 31,
+     "upgrades:s": 6,
+     "toggles:s": 1,
+     "reset:t": 14,
+     "buyables:t": 11,
+     "upgrades:t": 6,
+     "toggles:t": 1,
+     "reset:e": 6,
+     "upgrades:e": 3
+    }
+   },
+   "wallMs": 230033
+  },
+  "part3:S": {
+   "ok": true,
+   "ticks": 874,
+   "gameSeconds": 874,
+   "hashGame": "a44f1bd5010a4344",
+   "marks": {
+    "S01": {
+     "gameSeconds": 6
+    },
+    "S02": {
+     "gameSeconds": 484
+    },
+    "S03": {
+     "gameSeconds": 485
+    },
+    "S04": {
+     "gameSeconds": 485
+    },
+    "S05": {
+     "gameSeconds": 874
+    }
+   },
+   "eval": null,
+   "hook": {
+    "actions": {
+     "reset:unlock": 155,
+     "upgrades:unlock": 2,
+     "reset:fundamental": 87,
+     "upgrades:fundamental": 109,
+     "reset:primitive": 9,
+     "upgrades:primitive": 2
+    }
+   },
+   "wallMs": 12309
+  }
+ }
+}

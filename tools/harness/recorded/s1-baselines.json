@@ -1,0 +1,632 @@
+{
+ "about": "A RECORDING of the baseline side of S1 part 1 / 1s: each pinned row's baseline commit (and the 17260e03 table for the fresh-boot row), run in a throwaway worktree with only the `hashGame` patch and the Node 21+ shim repair. tools/harness/gates-s1.mjs compares HEAD against these results instead of re-running the old commit — ⚖ R12/R13 (user, 2026-09-29): the split imports a tree with no history, and nothing in it may need the old repository. The fields are exactly the ones the gate's rows read. See the gate's header for what comparing against a recording changes.",
+ "recorded": {
+  "from": "commit(s) 3bc12bf, 17260e03, 71da72e of the loader history, each run from a worktree, with no wall",
+  "by": "node tools/harness/gates-s1.mjs --part 1 --no-summary --record <file>, then --part 1s the same at fb45e525f (in tmt-loader-archive)",
+  "date": "2026-09-29",
+  "deterministic": "every result recorded twice, in two separate runs; the two recordings are equal field for field (wallMs, the informational wall clock, aside)"
+ },
+ "results": {
+  "a1-3-ptr": {
+   "ok": true,
+   "ticks": 2936,
+   "gameSeconds": 2936,
+   "hash": "dc00ee1692610100",
+   "hashGame": "3e5f28bd379c52e0",
+   "marks": {
+    "(i) b and g unlocked": {
+     "ticks": 1361,
+     "gameSeconds": 1361,
+     "hash": "d76c70bf74ede9ba",
+     "hashGame": "7b9f1114d17a0166"
+    },
+    "(ii) keep-upgrade milestones b0 + g0": {
+     "ticks": 2360,
+     "gameSeconds": 2360,
+     "hash": "f8a1534d326a4840",
+     "hashGame": "25f914a09d1019b1"
+    },
+    "(iii) b.best ≥ 15 and g.best ≥ 15": {
+     "ticks": 2936,
+     "gameSeconds": 2936,
+     "hash": "dc00ee1692610100",
+     "hashGame": "3e5f28bd379c52e0"
+    }
+   },
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:p",
+     true,
+     "interval>=10"
+    ],
+    [
+     "upgrades:p",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:b",
+     true,
+     "gain>=1"
+    ],
+    [
+     "reset:g",
+     true,
+     "gain>=1"
+    ],
+    [
+     "upgrades:b",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:g",
+     true,
+     "cheapest-first"
+    ]
+   ]
+  },
+  "a1-3-st": {
+   "ok": true,
+   "ticks": 3733,
+   "gameSeconds": 186.65,
+   "hash": "0253605cd2e69318",
+   "hashGame": "646cfcd97455704b",
+   "marks": {
+    "(i) first fundamental reset (fundamental.total ≥ 1)": {
+     "ticks": 102,
+     "gameSeconds": 5.1,
+     "hash": "bf6f8809a163efd8",
+     "hashGame": "5a03f1523ebc337d"
+    },
+    "(ii) unlock:upg:12": {
+     "ticks": 3733,
+     "gameSeconds": 186.65,
+     "hash": "0253605cd2e69318",
+     "hashGame": "646cfcd97455704b"
+    }
+   },
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:unlock",
+     true,
+     "always"
+    ],
+    [
+     "upgrades:unlock",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:fundamental",
+     true,
+     "interval>=5"
+    ],
+    [
+     "upgrades:fundamental",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "buyables:fundamental",
+     true,
+     "buyMax"
+    ]
+   ]
+  },
+  "a1-3-st-d1": {
+   "ok": true,
+   "ticks": 308,
+   "gameSeconds": 308,
+   "hash": "86da1eaa518021ad",
+   "hashGame": "72bbc89f083b4d50",
+   "marks": {
+    "(i) first fundamental reset (fundamental.total ≥ 1)": {
+     "ticks": 6,
+     "gameSeconds": 6,
+     "hash": "c3444d05fd80bba0",
+     "hashGame": "2fc43f3274a79fb0"
+    },
+    "(ii) unlock:upg:12": {
+     "ticks": 308,
+     "gameSeconds": 308,
+     "hash": "86da1eaa518021ad",
+     "hashGame": "72bbc89f083b4d50"
+    }
+   },
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:unlock",
+     true,
+     "always"
+    ],
+    [
+     "upgrades:unlock",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:fundamental",
+     true,
+     "interval>=5"
+    ],
+    [
+     "upgrades:fundamental",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "buyables:fundamental",
+     true,
+     "buyMax"
+    ]
+   ]
+  },
+  "a2-1-st": {
+   "ok": true,
+   "ticks": 9563,
+   "gameSeconds": 478.15,
+   "hash": "449775de97d4af2d",
+   "hashGame": "f77c6ac6dfd7bf1a",
+   "marks": {
+    "(i) primitive reset ≥ 1 (primitive.total ≥ 1)": {
+     "ticks": 4163,
+     "gameSeconds": 208.15,
+     "hash": "0c88dcd6b5a9e1cb",
+     "hashGame": "32c54b4e207fe18e"
+    },
+    "(ii) primitive ms 1 (\"10 Numbers\")": {
+     "ticks": 5963,
+     "gameSeconds": 298.15,
+     "hash": "5682500e1f849fb8",
+     "hashGame": "713f792e30d60f5d"
+    },
+    "(iii) primitive ms 2 (\"100,000 Numbers\")": {
+     "ticks": 9563,
+     "gameSeconds": 478.15,
+     "hash": "449775de97d4af2d",
+     "hashGame": "f77c6ac6dfd7bf1a"
+    }
+   },
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:unlock",
+     true,
+     "always"
+    ],
+    [
+     "upgrades:unlock",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:fundamental",
+     true,
+     "interval>=5"
+    ],
+    [
+     "upgrades:fundamental",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "buyables:fundamental",
+     true,
+     "buyMax"
+    ],
+    [
+     "reset:primitive",
+     true,
+     "interval>=90"
+    ],
+    [
+     "upgrades:primitive",
+     true,
+     "cheapest-first"
+    ]
+   ]
+  },
+  "a2-1-st-d1": {
+   "ok": true,
+   "ticks": 579,
+   "gameSeconds": 579,
+   "hash": "30d121d791768aa4",
+   "hashGame": "524822d719ceea18",
+   "marks": {
+    "(i) primitive reset ≥ 1 (primitive.total ≥ 1)": {
+     "ticks": 309,
+     "gameSeconds": 309,
+     "hash": "6da92645ec93a9ab",
+     "hashGame": "5de8903ce94ad67b"
+    },
+    "(ii) primitive ms 1 (\"10 Numbers\")": {
+     "ticks": 399,
+     "gameSeconds": 399,
+     "hash": "53240faafd36f329",
+     "hashGame": "070dc67eca5ac00f"
+    },
+    "(iii) primitive ms 2 (\"100,000 Numbers\")": {
+     "ticks": 579,
+     "gameSeconds": 579,
+     "hash": "30d121d791768aa4",
+     "hashGame": "524822d719ceea18"
+    }
+   },
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:unlock",
+     true,
+     "always"
+    ],
+    [
+     "upgrades:unlock",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:fundamental",
+     true,
+     "interval>=5"
+    ],
+    [
+     "upgrades:fundamental",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "buyables:fundamental",
+     true,
+     "buyMax"
+    ],
+    [
+     "reset:primitive",
+     true,
+     "interval>=90"
+    ],
+    [
+     "upgrades:primitive",
+     true,
+     "cheapest-first"
+    ]
+   ]
+  },
+  "a2-3-ptr": {
+   "ok": true,
+   "ticks": 8035,
+   "gameSeconds": 8035,
+   "hash": "67743dd40de0b570",
+   "hashGame": "6511fcca2c6ae896",
+   "marks": {
+    "(i) one of t/e/s unlocked": {
+     "ticks": 3550,
+     "gameSeconds": 3550,
+     "hash": "0513ad9b24806ecc",
+     "hashGame": "ff624de18438f176"
+    },
+    "(ii) t ms 3 or s ms 3 (b.auto / g.auto available)": {
+     "ticks": 6037,
+     "gameSeconds": 6037,
+     "hash": "f226c34064109dcb",
+     "hashGame": "b6fc0204a69bc54a"
+    },
+    "(iii) t, e and s unlocked": {
+     "ticks": 8035,
+     "gameSeconds": 8035,
+     "hash": "67743dd40de0b570",
+     "hashGame": "6511fcca2c6ae896"
+    }
+   },
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:p",
+     true,
+     "interval>=10"
+    ],
+    [
+     "upgrades:p",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:b",
+     true,
+     "gain>=1"
+    ],
+    [
+     "reset:g",
+     true,
+     "gain>=1"
+    ],
+    [
+     "upgrades:b",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:g",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:t",
+     true,
+     "interval>=5"
+    ],
+    [
+     "reset:e",
+     true,
+     "interval>=5"
+    ],
+    [
+     "reset:s",
+     true,
+     "interval>=5"
+    ],
+    [
+     "upgrades:t",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:e",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:s",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "buyables:e",
+     true,
+     "buy"
+    ],
+    [
+     "buyables:s",
+     true,
+     "buy"
+    ]
+   ]
+  },
+  "fresh:ptr": {
+   "ok": true,
+   "ticks": 0,
+   "gameSeconds": 0,
+   "hash": "1524248a0215690d",
+   "hashGame": "8daecd949227c861",
+   "marks": null,
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:p",
+     true,
+     "interval>=10"
+    ],
+    [
+     "upgrades:p",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "reset:b",
+     false,
+     "gain>=1"
+    ],
+    [
+     "reset:g",
+     false,
+     "gain>=1"
+    ],
+    [
+     "upgrades:b",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:g",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "reset:t",
+     false,
+     "interval>=5"
+    ],
+    [
+     "reset:e",
+     false,
+     "interval>=5"
+    ],
+    [
+     "reset:s",
+     false,
+     "interval>=5"
+    ],
+    [
+     "upgrades:t",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:e",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:s",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "buyables:e",
+     false,
+     "buy"
+    ],
+    [
+     "buyables:s",
+     false,
+     "buy"
+    ]
+   ]
+  },
+  "fresh:something": {
+   "ok": true,
+   "ticks": 0,
+   "gameSeconds": 0,
+   "hash": "9e6a37e690fab357",
+   "hashGame": "28679f5ef822ca55",
+   "marks": null,
+   "stall": null,
+   "featureStates": [
+    [
+     "reset:unlock",
+     true,
+     "always"
+    ],
+    [
+     "upgrades:unlock",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:fundamental",
+     false,
+     "interval>=5"
+    ],
+    [
+     "upgrades:fundamental",
+     false,
+     "cheapest-first"
+    ],
+    [
+     "buyables:fundamental",
+     false,
+     "buyMax"
+    ],
+    [
+     "reset:primitive",
+     false,
+     "interval>=90"
+    ],
+    [
+     "upgrades:primitive",
+     false,
+     "cheapest-first"
+    ]
+   ]
+  },
+  "stall-ptr": {
+   "ok": true,
+   "ticks": 14131,
+   "gameSeconds": 14131,
+   "hash": "46df73d4545bb4e2",
+   "hashGame": "f53368c9f575c56f",
+   "marks": {
+    "(i) one of t/e/s unlocked": {
+     "ticks": 3550,
+     "gameSeconds": 3550,
+     "hash": "0513ad9b24806ecc",
+     "hashGame": "ff624de18438f176"
+    },
+    "(ii) t ms 3 or s ms 3 (b.auto / g.auto available)": {
+     "ticks": 6037,
+     "gameSeconds": 6037,
+     "hash": "f226c34064109dcb",
+     "hashGame": "b6fc0204a69bc54a"
+    },
+    "(iii) t, e and s unlocked": {
+     "ticks": 8035,
+     "gameSeconds": 8035,
+     "hash": "67743dd40de0b570",
+     "hashGame": "6511fcca2c6ae896"
+    }
+   },
+   "stall": {
+    "stalled": true,
+    "walled": false,
+    "lastProgress": {
+     "ticks": 10531
+    }
+   },
+   "featureStates": [
+    [
+     "reset:p",
+     true,
+     "interval>=10"
+    ],
+    [
+     "upgrades:p",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:b",
+     true,
+     "gain>=1"
+    ],
+    [
+     "reset:g",
+     true,
+     "gain>=1"
+    ],
+    [
+     "upgrades:b",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:g",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "reset:t",
+     true,
+     "interval>=5"
+    ],
+    [
+     "reset:e",
+     true,
+     "interval>=5"
+    ],
+    [
+     "reset:s",
+     true,
+     "interval>=5"
+    ],
+    [
+     "upgrades:t",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:e",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "upgrades:s",
+     true,
+     "cheapest-first"
+    ],
+    [
+     "buyables:e",
+     true,
+     "buy"
+    ],
+    [
+     "buyables:s",
+     true,
+     "buy"
+    ]
+   ]
+  }
+ }
+}

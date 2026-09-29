@@ -46,7 +46,8 @@ const row = (r) => { rows.push(r); console.log(`${r.ok ? 'GREEN' : 'RED  '} ${r.
 // ⛔ THE FLOOR EACH PART MUST REACH (`--assert`), counted from what each part EMITS.
 // 1: 18 sample games (6 named + a dozen) + purity + upgrades + accuracy verdict · 2: coverage, control, recovery, verdict · 3: four + verdict
 // 4: four legs + verdict · 5: planner rows, four stretch cells, verdict · 6: fifteen tests + verdict · 7: eleven cells + verdict
-const ROWS = { 1: 21, 2: 4, 3: 5, 4: 5, 5: 6, 6: 16 };   // 7: RETIRED by R3c Part 0 (see RETIRED below)
+const ROWS = { 1: 21, 2: 4, 3: 5, 4: 5, 5: 6, 6: 17 };   // 7: RETIRED by R3c Part 0 (see RETIRED below). 6: 16 → 17 at S1T
+// (2026-09-29): auto-tables.test.mjs gained "every commit a shipped table cites is in the frozen list" (R12/R13).
 
 const DATA = path.join(REPO, 'games-data');
 const readData = (id) => JSON.parse(fs.readFileSync(path.join(DATA, id + '.json'), 'utf8'));

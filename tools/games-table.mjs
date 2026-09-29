@@ -166,7 +166,15 @@ export function checkSelfDeclared({ manifest = readManifest } = {}) {
   const index = JSON.parse(fs.readFileSync(path.join(REPO, 'manifests/index.json'), 'utf8'));
   const byId = new Map(index.map((e) => [e.id, e]));
   let checked = 0, undeclared = 0;
+  // ⛔ A GAME THAT IS NOT THERE IS A REFUSAL, never "declares nothing" (S0's P3, 2026-09-29): with no games/ at all this
+  // check read zero files per game, counted all 175 as undeclared, and exited GREEN — which is exactly what an
+  // uninitialised submodule (S2) looks like. So: games/ must exist and hold something, and each game must have at
+  // least one of the files its manifest says the loader loads.
+  const gamesDir = path.join(REPO, 'games');
+  if (!fs.existsSync(gamesDir) || !fs.readdirSync(gamesDir).some((x) => x !== '.git')) return { ok: false, checked: 0, undeclared: 0, problems: ['games/ is absent or empty — nothing to read the games\' own declarations from (an uninitialised submodule?)'] };
   for (const id of GAMES()) {
+    const src = sourcesOf(id, 'loaded');
+    if (!src.files.length) { problems.push(`${id}: none of the game's loaded files can be read (${src.missing}) — its own declaration is unreadable, which is not the same as "declares nothing"`); continue; }
     const m = manifest(id), own = selfDeclared(id);
     for (const k of ['name', 'author', 'version']) {
       if (own[k] === null) { if (k === 'name') undeclared++; continue; }  // the game declares nothing: not a drift

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // C1c — the three defects V6 + C1b left (tmt-automation-plan §52–§53).
 //
-//   node tools/harness/gates-c1c.mjs --part 1..4 [--pool N] [--repeat N] [--before-root DIR] [--no-summary] [--no-write] [--assert]
+//   node tools/harness/gates-c1c.mjs --part 1..4 [--pool N] [--repeat N] [--no-summary] [--no-write] [--assert]
 //
 // Part 1  THE NUMBER HELPER BY CAPABILITY. Every game booted (`number-capability.js`): the type the planner resolved
 //         (`player.points`' constructor), whether it has every method each planner operation calls, and a numeric
@@ -10,27 +10,35 @@
 //         no global `Decimal` regenerated: `games-data/` before → after, and the regeneration equal to what is committed.
 // Part 2  BUYING THE WORD IDS IS A BEHAVIOUR CHANGE — measured (a MEASUREMENT: measurements.yml). Each game whose
 //         enumeration changed, fresh, `--profile all`, diff 1, seed 1, over a fixed horizon, at HEAD and at the
-//         BEFORE commit (a control worktree): the progress tracker's events per game-second, hashGame, the actions per
+//         BEFORE commit (its RECORDING — below): the progress tracker's events per game-second, hashGame, the actions per
 //         feature, and which word-id things were bought (the amount / ownership / completions at the end).
 // Part 3  INERTNESS where every purchase id is numeric (must HOLD: sweep.yml). ptr's opening (fresh → M12, pinned
 //         6862 / cf8df88462606277), ptr all/M15 → M25 (pinned 28260 / dee581e710a1bf53, the F1 chain), Something Tree fresh → S05 — each at HEAD twice and at the
-//         BEFORE commit once, marks + end game-second + hashGame equal.
+//         BEFORE commit (its RECORDING), marks + end game-second + hashGame equal.
 // Part 4  BUTTONS AND FACES (Part 3 of the brief): the `raises` census from the committed data, universal-reconstruction's
 //         enumeration at boot (6 faces out, 18 buttons in) and its derive-time finding, and the unit tests
 //         (`loader/c1c.test.mjs`), one row each.
-// ⛔ The BEFORE side is a control worktree at BEFORE (`git worktree add --detach`), removed when the part ends; pass
-//    `--before-root` to reuse one. A CI checkout needs the history (fetch-depth 0).
+// ⛔ THE BEFORE SIDE IS A RECORDING (S1T, 2026-09-29; ⚖ R12/R13 — the split imports a history-free tree and nothing in it
+//    may need the old repository). Parts 2 and 3 used to run BEFORE itself in a control worktree (`git worktree add
+//    --detach … 4d8ee5a69`, which needed `fetch-depth: 0`). They now read `tools/harness/recorded/c1c-before.json`: what
+//    those BEFORE runs produced — the fields the rows read, and nothing else — recorded once at S1T from the worktree
+//    runs (twice, byte-equal: the runs are deterministic), by the `--record` flag this file carried at `fb45e525f` (record mode: that side only, no wall).
+//    ⚠ WHAT THAT CHANGES: the rows now prove "HEAD equals what BEFORE produced ON THE DAY IT WAS RECORDED", not "HEAD
+//    equals what BEFORE's code produces today". The two differ only if something BEFORE's run read has moved since —
+//    for part 2, HEAD's `games-data/` (the lift script prepends it on both sides) and `lift-word.js`; for both parts, a
+//    game's files under games/ or a ladder / snapshot fixture. A change there that moves HEAD's side now reads as a
+//    move against BEFORE; re-record from the archive (`tmt-loader-archive`, the commit above) if it was intended.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { REPO, GAMES, parseArgs, writeJSON, headCommit, treeDirty, entryOnly } from './lib.mjs';
 import { appendSection } from './summary.mjs';
 entryOnly(import.meta.url);
 
 // ⛔ EVERY FLAG THIS FILE READS IS DECLARED, and the booleans are booleans (an undeclared flag takes the NEXT token).
 const a = parseArgs(process.argv.slice(2), ['no-summary', 'no-write', 'assert']);
-const KNOWN = new Set(['_', 'part', 'pool', 'repeat', 'before-root', 'no-summary', 'no-write', 'assert']);
+const KNOWN = new Set(['_', 'part', 'pool', 'repeat', 'no-summary', 'no-write', 'assert']);
 for (const k of Object.keys(a)) if (!KNOWN.has(k)) { console.error(`REFUSED: unknown flag --${k}`); process.exit(2); }
 const PART = String(a.part || '1');
 const POOL = Number(a.pool || 4), REPEAT = Number(a.repeat || 2);
@@ -43,6 +51,10 @@ const ROWS = { 1: 6, 2: 15, 3: 4, 4: 12 };
 
 /** The commit BEFORE C1c — main at the brief's writing (`tmt-auto-21`), the last with `numIds` and the `Decimal` helper. */
 const BEFORE = '4d8ee5a69';
+/** BEFORE's recorded runs: {<part>:<leg>: {ok, ticks, gameSeconds, hashGame, marks, eval, hook, wallMs}}. A leg with no
+ *  recording is a RED row (ok: false), never a skip. */
+const RECORDING = 'tools/harness/recorded/c1c-before.json';
+const recorded = (() => { let r = null; return (key) => { r ??= JSON.parse(fs.readFileSync(path.join(REPO, RECORDING), 'utf8')).results; return r[key] ?? { ok: false, error: `no recording for ${key} in ${RECORDING}` }; }; })();
 
 function child(args, { cwd = REPO, timeoutMs = 600e3 } = {}) {
   return new Promise((resolve) => {
@@ -73,22 +85,6 @@ async function runAt(root, id, flags) {
 }
 const markSec = (r) => Object.fromEntries(Object.entries(r.marks || {}).map(([k, m]) => [k, m ? m.gameSeconds : null]));
 const agree = (x, y) => !!x && !!y && x.ok !== false && y.ok !== false && x.gameSeconds === y.gameSeconds && x.hashGame === y.hashGame && JSON.stringify(markSec(x)) === JSON.stringify(markSec(y));
-
-// ---- the control tree ------------------------------------------------------------------------------------------------
-let made = null;
-function beforeRoot() {
-  if (a['before-root']) return path.resolve(a['before-root']);
-  if (made) return made;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'c1c-before-'));
-  execFileSync('git', ['-C', REPO, 'worktree', 'add', '--detach', dir, BEFORE], { stdio: 'ignore' });
-  made = dir;
-  return dir;
-}
-function dropControl() {
-  if (!made) return;
-  try { execFileSync('git', ['-C', REPO, 'worktree', 'remove', '--force', made], { stdio: 'ignore' }); } catch { fs.rmSync(made, { recursive: true, force: true }); }
-  made = null;
-}
 
 // ---- Part 1 ---------------------------------------------------------------------------------------------------------
 // The two games with NO global `Decimal` (the planner's census, §53-R), BEFORE and AFTER. Before = `games-data/` at
@@ -165,14 +161,13 @@ function liftScript(id) {
   return out;
 }
 async function part2() {
-  const root = beforeRoot();
   const jobs = [];
   const flagsOf = (id, kind) => (kind === 'fresh' ? P2FLAGS : { ...P2FLAGS, ticks: LIFT_TICKS, planner: true, 'planner-script': liftScript(id) });
-  for (const kind of ['fresh', 'lifted']) for (const id of P2) { for (let k = 0; k < REPEAT; k++) jobs.push({ id, kind, side: 'after', k }); jobs.push({ id, kind, side: 'before', k: 0 }); }
-  const out = await pool(jobs, POOL, async (j) => ({ ...j, r: await runAt(j.side === 'after' ? REPO : root, j.id, flagsOf(j.id, j.kind)) }));
+  for (const kind of ['fresh', 'lifted']) for (const id of P2) for (let k = 0; k < REPEAT; k++) jobs.push({ id, kind, side: 'after', k });
+  const out = await pool(jobs, POOL, async (j) => ({ ...j, r: await runAt(REPO, j.id, flagsOf(j.id, j.kind)) }));
   const actions = (r) => Object.entries(r.hook?.actions || {}).sort().map(([k, v]) => `${k} ${v}`).join(', ') || 'none';
   for (const kind of ['fresh', 'lifted']) for (const id of P2) {
-    const af = out.filter((x) => x.id === id && x.kind === kind && x.side === 'after').map((x) => x.r), bf = out.find((x) => x.id === id && x.kind === kind && x.side === 'before').r;
+    const af = out.filter((x) => x.id === id && x.kind === kind && x.side === 'after').map((x) => x.r), bf = recorded(`part2:${kind}:${id}`);
     const H = kind === 'fresh' ? HORIZON : LIFT_TICKS;
     const A = af[0], twice = af.every((r) => agree(r, A));
     const ev = (r) => (r.eval && r.eval.events != null ? r.eval.events : null);
@@ -181,7 +176,7 @@ async function part2() {
     const lift = A.plannerScript && !A.plannerScript.error ? `lifted ${A.plannerScript.lifted.length} (skipped ${A.plannerScript.skipped.length}${A.plannerScript.skipped.length ? ': ' + A.plannerScript.skipped.slice(0, 6).join('; ') : ''}); ` : '';
     row({ gate: kind === 'fresh' ? `C1c-2 BEFORE → AFTER, fresh ${H} game-s, profile all, diff 1, seed 1` : `C1c-2 BEFORE → AFTER, LIFTED (lift-word.js on the fresh boot), ${H} game-s, profile all, diff 1, seed 1`, id,
       ok: A.ok !== false && bf.ok !== false && twice && A.gameSeconds === H && bf.gameSeconds === H, ticks: A.ticks, gameSeconds: A.gameSeconds, diff: 1, hash: A.hashGame,
-      notes: `${lift}events/game-s ${rate(bf)} → ${rate(A)} (${ev(bf)} → ${ev(A)}); hashGame ${bf.hashGame} → ${A.hashGame} (${same ? 'UNMOVED' : 'MOVED'}); word-id things held at the end: before ${JSON.stringify(bf.eval?.word || {})} → after ${JSON.stringify(A.eval?.word || {})}${A.eval?.f13 != null ? `; f 13's slot ${bf.eval?.f13} → ${A.eval.f13}` : ''}; actions before [${actions(bf)}] → after [${actions(A)}]; after twice equal ${twice}; wall ${Math.round(A.wallMs / 1000)}s / ${Math.round(bf.wallMs / 1000)}s` });
+      notes: `${lift}events/game-s ${rate(bf)} → ${rate(A)} (${ev(bf)} → ${ev(A)}); hashGame ${bf.hashGame} → ${A.hashGame} (${same ? 'UNMOVED' : 'MOVED'}); word-id things held at the end: before ${JSON.stringify(bf.eval?.word || {})} → after ${JSON.stringify(A.eval?.word || {})}${A.eval?.f13 != null ? `; f 13's slot ${bf.eval?.f13} → ${A.eval.f13}` : ''}; actions before [${actions(bf)}] → after [${actions(A)}]; after twice equal ${twice}; wall ${Math.round(A.wallMs / 1000)}s (BEFORE ${Math.round(bf.wallMs / 1000)}s when recorded)` });
   }
   row({ gate: 'C1c-2 VERDICT (a measurement: every leg ran, twice equal at HEAD; the table is the finding)', id: '—', ok: rows.every((r) => r.ok), notes: `${rows.filter((r) => r.ok).length}/${rows.length}` });
 }
@@ -197,18 +192,17 @@ const LEGS = [
 // ⚠ MEASURED: under a pool of 4 the long leg (20,092 ticks) ran 572 s and was cut by its wall 132 game-s short of
 // M25 — so this part runs at most THREE children at once (one per leg), whatever --pool says.
 async function part3() {
-  const root = beforeRoot();
   const jobs = [];
-  for (const L of LEGS) { for (let k = 0; k < REPEAT; k++) jobs.push({ L, side: 'after', k }); jobs.push({ L, side: 'before', k: 0 }); }
-  const out = await pool(jobs, Math.min(POOL, 3), async (j) => ({ ...j, r: await runAt(j.side === 'after' ? REPO : root, j.L.id, j.L.flags) }));
+  for (const L of LEGS) for (let k = 0; k < REPEAT; k++) jobs.push({ L, side: 'after', k });
+  const out = await pool(jobs, Math.min(POOL, 3), async (j) => ({ ...j, r: await runAt(REPO, j.L.id, j.L.flags) }));
   for (const L of LEGS) {
-    const af = out.filter((x) => x.L === L && x.side === 'after').map((x) => x.r), bf = out.find((x) => x.L === L && x.side === 'before').r;
+    const af = out.filter((x) => x.L === L && x.side === 'after').map((x) => x.r), bf = recorded(`part3:${L.key}`);
     const A = af[0], twice = af.every((r) => agree(r, A)), same = agree(A, bf);
     const ms = markSec(A);
     const pinOk = !L.pin || (ms[L.pin.mark] === L.pin.gs && A.hashGame === L.pin.hashGame);
     row({ gate: `C1c-3 INERTNESS — ${L.name}: HEAD ≡ ${BEFORE} (marks, end game-second, hashGame)`, id: L.id, ok: A.ok !== false && twice && same && pinOk,
       ticks: A.ticks, gameSeconds: A.gameSeconds, diff: 1, hash: A.hashGame,
-      notes: `${Object.entries(ms).map(([k, v]) => `${k} ${v}`).join(' · ')}; end ${A.gameSeconds} / ${A.hashGame}; before ${bf.gameSeconds} / ${bf.hashGame} — ${same ? 'EQUAL' : 'DIFFERENT'}${L.pin ? `; pinned ${L.pin.mark} ${L.pin.gs} / ${L.pin.hashGame}: ${pinOk ? 'held' : 'MOVED'}` : ''}; twice equal ${twice}; wall ${Math.round(A.wallMs / 1000)}s` });
+      notes: `${Object.entries(ms).map(([k, v]) => `${k} ${v}`).join(' · ')}; end ${A.gameSeconds} / ${A.hashGame}; before (recorded) ${bf.gameSeconds} / ${bf.hashGame} — ${same ? 'EQUAL' : 'DIFFERENT'}${L.pin ? `; pinned ${L.pin.mark} ${L.pin.gs} / ${L.pin.hashGame}: ${pinOk ? 'held' : 'MOVED'}` : ''}; twice equal ${twice}; wall ${Math.round(A.wallMs / 1000)}s` });
   }
   row({ gate: 'C1c-3 VERDICT: where every purchase id is numeric, nothing moved', id: '—', ok: rows.every((r) => r.ok), notes: `${rows.filter((r) => r.ok).length}/${rows.length}` });
 }
@@ -244,7 +238,7 @@ async function part4() {
 
 const PARTS = { 1: part1, 2: part2, 3: part3, 4: part4 };
 if (!PARTS[PART]) { console.error(`no part ${PART}`); process.exit(2); }
-try { await PARTS[PART](); } finally { dropControl(); }
+await PARTS[PART]();
 const red = rows.filter((r) => !r.ok).length;
 const verdict = `C1c part ${PART}: rows ${rows.length}/${ROWS[PART]} expected, ${red} RED`;
 console.log(`\nVERDICT: ${verdict}`);

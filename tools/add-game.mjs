@@ -27,6 +27,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { REPO, parseArgs, headCommit, treeDirty, sha256hex, writeJSON, readManifest } from './harness/lib.mjs';
 import { processGame, writeSkips, checkMedia } from './media.mjs';
 import { SKIPS_FILE } from './media-lib.mjs';
+import { writeRecordFromDisk } from './pristine.mjs';
 
 const a = parseArgs(process.argv.slice(2), ['dry-run', 'au-check', 'summary']);
 const CENSUS = path.resolve(a.census || process.env.TMT_CENSUS || path.join(REPO, '..', 'tmt-fork-census'));
@@ -218,6 +219,12 @@ for (const r of results) {
     if (d.status !== 0) { r.error = `diff -r games/${r.id} vs the census clone is NOT empty — not patched, subtree left for the planner:\n${(d.stdout + d.stderr).slice(0, 1500)}`; log(r.error); continue; }
     r.subtree = { remote, squash: git('log', '--format=%h', `--grep=^Squashed 'games/${r.id}/' content from commit`, '-n', '1'), merge: git('rev-parse', '--short', 'HEAD') };
     r.added = true;
+    // 2a. the PRISTINE RECORD (R12/R13): games/<id>/ is upstream's bytes right now (the diff above proved it) and the
+    // media step below is about to change some of them — so this is the one moment the record can be read off the
+    // disk. G4 compares against it from then on (tools/pristine.mjs; it never looks for the squash in the history).
+    // Uncommitted, like the manifest it belongs with (phase 3).
+    const pr = writeRecordFromDisk(r.id, r.sha, { root: REPO });
+    r.pristine = { record: `games-pristine/${r.id}.json`, tree: pr.upstream.tree };
     // 2b. ⚖ the media exception (user, 2026-09-22): images → WebP at the same pixel size, audio → the silent stub, same
     // filenames — AFTER the pristine diff above (which compares the originals), and as its OWN commit, so the squash
     // stays upstream's bytes and the compression is a separate, revertible change. A failure restores every original
@@ -304,7 +311,7 @@ if (added.length) {
     try {
       const cm = checkManifest(id);
       r.gates.checkManifest = cm.ok ? 'GREEN' : RED(JSON.stringify(cm.problems));
-      row('check-manifest', cm.ok, { ticks: 0, gameSeconds: 0, notes: cm.ok ? `${cm.scripts} scripts, ${cm.modFiles} modFiles, subtree split ${cm.subtreeSplit?.slice(0, 7)}, games/${id} pristine${cm.mediaFiles ? ` up to ${cm.mediaFiles} processed media files` : ''}` : JSON.stringify(cm.problems).slice(0, 400) });
+      row('check-manifest', cm.ok, { ticks: 0, gameSeconds: 0, notes: cm.ok ? `${cm.scripts} scripts, ${cm.modFiles} modFiles, upstream ${cm.upstreamCommit?.slice(0, 7)}, games/${id} pristine${cm.mediaFiles ? ` up to ${cm.mediaFiles} processed media files` : ''}` : JSON.stringify(cm.problems).slice(0, 400) });
     } catch (e) { r.gates.checkManifest = RED(e.message); row('check-manifest', false, { notes: String(e.message).slice(0, 400) }); }
     // the media check (the gate CI's fast job runs over the roster): every image WebP, every audio file the stub
     try {

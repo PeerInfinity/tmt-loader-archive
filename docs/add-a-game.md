@@ -138,6 +138,16 @@ the published site when someone publishes: `gh workflow run pages.yml --ref main
 the push until the counts in `docs/mobile.md` are re-measured against the new roster. That is deliberate: every "N of 171"
 in that document is stale the moment the roster grows, and three of them shipped wrong before anything checked.
 
+> **S1T (2026-09-29, ⚖ R12/R13) — the pristine RECORD.** `check-manifest` no longer finds the subtree squash in the
+> history (the repository split imports a tree without history). Each game has `games-pristine/<id>.json`: the upstream
+> commit, the upstream tree id, and every file's git blob id, generated from the squash commits for the 175 games
+> hosted at the split. `add-game.mjs` now writes it in phase 2, right after the `diff -r` and BEFORE the media step —
+> the one moment `games/<id>/` is upstream's bytes — and it lands uncommitted with the manifest. For a RE-PIN, record
+> from a checkout of the new upstream commit, not from `games/<id>/` (whose untouched media is still processed):
+> `node tools/pristine.mjs --write <id> --from <checkout>`, after updating `manifests/<id>.json`'s `upstream.commit`.
+> The media rule below is unchanged; "the squash" in it now reads "the record". docs/harness.md, "No gate reads git
+> history".
+
 ## Media: the one exception to pristine
 
 ⚖ **User ruling, 2026-09-22** — verbatim: *"All of the repos are MIT licensed. I'll want to set up a script to automate

@@ -4,6 +4,7 @@
 #   tools/harness/mutants-assets1.sh            (needs the repo's .venv with Pillow for M1, Playwright for M3)
 # M1 the encoder DOWNSCALES              → media.mjs --write refuses (DIMENSIONS CHANGED), originals restored
 # M2 a `git subtree pull` restores an image and an audio original (committed) → media.mjs RED, check-manifest RED
+# M6 the pristine RECORD is edited (one blob id)  → check-manifest `games pristine (record)` RED (its tree id moves)
 # M3 an audio stub is a 404 instead      → G1 (page.mjs --gate load) RED
 # M4 a CODE file / a LICENCE is edited   → check-manifest `games pristine` RED (the exception is media only)
 # M5 the CI media step is deleted        → loader/workflows.test.mjs RED
@@ -12,14 +13,27 @@ REPO=$(cd "$(dirname "$0")/../.." && pwd)
 WT=$(mktemp -d "${TMPDIR:-/tmp}/assets1-mutants-XXXXXX")
 git -C "$REPO" worktree add --detach -q "$WT" HEAD
 ln -s "$REPO/node_modules" "$WT/node_modules"
-export TMT_PYTHON="$REPO/.venv/bin/python3"
+export TMT_PYTHON="${TMT_PYTHON:-$REPO/.venv/bin/python3}"
 cd "$WT"
 git config user.name "assets1 mutants"; git config user.email "mutants@localhost"
 pass=0; fail=0
 verdict() { if [ "$2" = red ]; then echo "KILLED  $1"; pass=$((pass+1)); else echo "SURVIVED $1 — $3"; fail=$((fail+1)); fi; }
-original() { # <id> <rel> → the upstream bytes, from the subtree squash commit
-  local sq; sq=$(git log --format=%H --grep="^Squashed 'games/$1/' content from commit" -n 1)
-  git show "$sq:$2" > "games/$1/$2"
+original() { # <id> <rel> → an UNPROCESSED stand-in for upstream's original: an image re-saved in its own extension's
+  # format at its own pixel size (Pillow), an audio file that is not the stub. ⚖ R12/R13 (2026-09-29): this read the
+  # original bytes out of the git-subtree squash commit, which a history-free import does not have. What M1 and M2 need
+  # is a RAW file where a processed one was — not upstream's exact bytes — so the stand-in tests the same thing.
+  "$TMT_PYTHON" - "games/$1/$2" <<'PY'
+import sys
+from PIL import Image
+p = sys.argv[1]
+ext = p.rsplit('.', 1)[-1].lower()
+if ext in ('png', 'gif', 'jpg', 'jpeg'):
+    im = Image.open(p); im.load()
+    fmt = {'png': 'PNG', 'gif': 'GIF', 'jpg': 'JPEG', 'jpeg': 'JPEG'}[ext]
+    (im.convert('RGB') if fmt == 'JPEG' else im).save(p, format=fmt)
+else:
+    open(p, 'wb').write(b'RIFF' + bytes(60))  # an audio file that is not the silent stub
+PY
 }
 
 # M1 — downscale
@@ -51,6 +65,16 @@ git reset -q --hard HEAD~1
 echo "mutant" >> games/ptr/LICENSE; git commit -qam "mutant: a licence edit"
 if node tools/harness/check-manifest.mjs ptr 2>/dev/null | grep -q '"rel":"LICENSE"'; then verdict "M4b licence edit → games pristine (notMedia LICENSE)" red; else verdict M4b green "$(node tools/harness/check-manifest.mjs ptr 2>&1 | tail -2)"; fi
 git reset -q --hard HEAD~1
+
+# M6 — the record is edited: one file's blob id changed (to the id of the processed bytes, the likeliest "fix")
+python3 - <<'PY'
+import json, re
+p = 'games-pristine/ptr.json'; s = open(p).read()
+m = re.search(r'"js/mod.js": "([0-9a-f]{40})"', s); assert m
+open(p, 'w').write(s.replace(m.group(1), '0' * 40))
+PY
+if node tools/harness/check-manifest.mjs ptr 2>/dev/null | grep -q '"games pristine (record)"'; then verdict "M6 record edited → games pristine (record)" red; else verdict M6 green "$(node tools/harness/check-manifest.mjs ptr 2>&1 | tail -2)"; fi
+git checkout -q HEAD -- games-pristine
 
 # M5 — the CI step deleted
 python3 - <<'EOF'

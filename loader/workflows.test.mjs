@@ -350,14 +350,20 @@ test('⚠ the headless half does NOT install a browser — that is the reason it
   assert.match(cmds(j['v1-page']), /playwright install/, 'the page V1 job has no browser');
 });
 
-test('⛔ the a1 job checks out the whole history — its check-manifest row reads it', () => {
-  // MEASURED in production on the job's first run (35458073272): part 2's `check-manifest` row searches the whole
-  // history for each game's subtree-squash commit, so a depth-1 checkout returns `null` for both halves and the row
-  // goes RED for a reason that has nothing to do with the au tab. A future "why is this job cloning 450 MB?" is
-  // exactly how that comes back, so the answer is here rather than only in the YAML comment.
+test('⛔ NO job checks out the history — no gate may need it (⚖ R12/R13, S1T)', () => {
+  // The a1 job used to assert `fetch-depth: 0` HERE, because its check-manifest row searched the history for each
+  // game's subtree-squash commit (measured RED at depth 1 in production, run 35458073272); c1-data (the provenance
+  // gate's `merge-base --is-ancestor`), c1c-inert / c1c-buy (a worktree at the commit before C1c) and anchors (worktrees
+  // at the S1 baselines) needed it too. The split imports a history-free tree (R12) and nothing in it may need the old
+  // repository (R13), so each of those now reads a committed recording — and a `fetch-depth: 0` coming back is the
+  // first sign that a gate reaches for history again. This asserts the line that RUNS (comments stripped).
+  for (const f of ['sweep.yml', 'measurements.yml', 'pages.yml']) {
+    const live = wf(f).split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+    assert.doesNotMatch(live, /fetch-depth:\s*0\b/, `${f} checks out the whole history again — which gate reads it?`);
+  }
   const j = jobs(wf('sweep.yml'));
-  const checkout = j.a1.split(/^ {6}- /m).find((st) => st.includes('actions/checkout'));
-  assert.match(checkout, /fetch-depth: 0/, 'the a1 job takes a shallow checkout — check-manifest cannot read the subtree squash');
+  const steps = j.fast.split(/^ {6}- /m).slice(1);
+  assert.ok(steps.some((st) => st.includes('node tools/pristine.mjs --check') && !st.includes('GITHUB_STEP_SUMMARY')), 'the fast job no longer checks the pristine records');
 });
 
 test('⛔ the a1 job asks the gate to prove what it COVERED, not just that nothing failed', () => {
@@ -384,6 +390,6 @@ test('⛔ C1: the fast job checks the tables\' schema and the currency index as 
     for (const p of parts) assert.match(j[name], new RegExp(`gates-c1\\.mjs --part ${p} [^\\n]*--assert`), `${name} does not run part ${p} with --assert`);
   }
   assert.doesNotMatch(j['c1-consumers'], /gates-c1\.mjs --part 7 /, 'the retired part 7 is still a CI step');
-  // the provenance gate asks `merge-base --is-ancestor` of every record's commit: a depth-1 checkout makes every record RED
-  assert.match(j['c1-data'], /fetch-depth: 0/, 'the c1-data job checks out one commit — the provenance gate cannot see the history');
+  // (the provenance gate used to need the whole history here — `merge-base --is-ancestor`; it reads the frozen commit
+  // list now, and the history-free test above holds every job to depth 1)
 });

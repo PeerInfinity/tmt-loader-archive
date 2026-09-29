@@ -1,7 +1,8 @@
 // C1 (§40-R ruling B) — the per-game tables as JSON with a PUBLISHED schema, and provenance as a GATE.
 //
 // Each leg names what it fails and the message it must fail BY NAME: an unknown key, an unknown version, a missing
-// provenance record, a provenance commit that is not an ancestor of HEAD. Two runners share one schema and one
+// provenance record, a provenance commit that is not in the frozen commit list (R12/R13: it used to be "not an ancestor
+// of HEAD", which needed the history). Two runners share one schema and one
 // validator (`tools/auto-tables.mjs` extracts the loader's `<table-schema>` block), so every leg is asked of BOTH:
 // the CI tool, and the loader at load.
 import { test } from 'node:test';
@@ -9,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadSchemaBlock, checkTables, checkProvenance, parseStrict, schemaText, summaryLabels, gateInSummary } from '../tools/auto-tables.mjs';
+import { loadSchemaBlock, checkTables, checkProvenance, parseStrict, schemaText, summaryLabels, gateInSummary, frozenCommits, tableFiles } from '../tools/auto-tables.mjs';
 import { parseStrict as parseCurrency } from '../tools/currency-data.mjs';
 import { bootStub, Decimal } from './stub-engine.mjs';
 
@@ -56,7 +57,7 @@ test('a MALFORMED provenance record fails the schema (a record is structured, no
 const labels = summaryLabels();
 const always = () => true;
 test('the provenance gate is GREEN on the shipped ptr table, and its two anchors are real', () => {
-  const r = checkProvenance(ptr, { labels, ancestor: always });
+  const r = checkProvenance(ptr, { labels, known: always });
   assert.deepEqual(r.missing, []);
   assert.deepEqual(r.bad, []);
   assert.ok(gateInSummary('R1′-2.3', labels) && gateInSummary('A1-3', labels), 'the SUMMARY label reader found nothing');
@@ -66,16 +67,16 @@ test('the provenance gate is GREEN on the shipped ptr table, and its two anchors
 test('a MISSING provenance record fails by name — for a policy, a gate, a keep and an unlockOrder list', () => {
   for (const k of ['reset:p', 'challenges:h', 'reset:b', 'unlockOrder:1']) {
     const t = clone(ptr); delete t.provenance[k];
-    assert.ok(checkProvenance(t, { labels, ancestor: always }).missing.includes(k), `deleting ${k}'s record was not noticed`);
+    assert.ok(checkProvenance(t, { labels, known: always }).missing.includes(k), `deleting ${k}'s record was not noticed`);
   }
 });
 
-test('a provenance commit that is NOT AN ANCESTOR fails by name, and so does a gate id no SUMMARY row carries', () => {
+test('a provenance commit NOT IN THE FROZEN LIST fails by name, and so does a gate id no SUMMARY row carries', () => {
   const t = clone(ptr);
-  const bad = checkProvenance(t, { labels, ancestor: (c) => c !== t.provenance['reset:e'].commit });
-  assert.ok(bad.bad.some((b) => b.startsWith('reset:e: commit') && /not an ancestor of HEAD/.test(b)), JSON.stringify(bad.bad));
+  const bad = checkProvenance(t, { labels, known: (c) => c !== t.provenance['reset:e'].commit });
+  assert.ok(bad.bad.some((b) => b.startsWith('reset:e: commit') && /not in the frozen commit list/.test(b)), JSON.stringify(bad.bad));
   const u = clone(ptr); u.provenance['reset:e'].gate = 'R1′-2.2';
-  assert.ok(checkProvenance(u, { labels, ancestor: always }).bad.some((b) => /reset:e: gate "R1′-2\.2" appears in no/.test(b)));
+  assert.ok(checkProvenance(u, { labels, known: always }).bad.some((b) => /reset:e: gate "R1′-2\.2" appears in no/.test(b)));
 });
 
 test('an UNVERIFIED record is listed, never failed — and never carries an invented gate id', () => {
@@ -85,7 +86,7 @@ test('an UNVERIFIED record is listed, never failed — and never carries an inve
   st.policies['reset:unlock'] = 'always'; st.policies['buyables:fundamental'] = 'buyMax';
   st.provenance['reset:unlock'] = { unverified: true, note: 'constructed: no row measures this entry' };
   st.provenance['buyables:fundamental'] = { unverified: true, note: 'constructed: no row measures this entry' };
-  const r = checkProvenance(st, { labels, ancestor: always });
+  const r = checkProvenance(st, { labels, known: always });
   assert.deepEqual(r.bad, []);
   assert.equal(r.unverified.length, 2);
   const t = clone(st); t.provenance['reset:unlock'].gate = 'A1';
@@ -97,4 +98,18 @@ test('both tools DECLARE every flag — an unknown one is a hard error, not an i
   assert.throws(() => parseCurrency(['--assert']), /unknown flag --assert/);
   assert.throws(() => parseCurrency(['--check', '--write']), /exclusive/);
   assert.deepEqual(parseCurrency(['--check', '--shard', '2/3']), { check: true, shard: '2/3' });
+});
+
+test('every commit a shipped table cites is in the frozen list, and every entry names the commit it is keyed by (R12/R13)', () => {
+  const frozen = frozenCommits(REPO);
+  const cited = [];
+  for (const f of tableFiles(REPO)) {
+    const t = JSON.parse(fs.readFileSync(path.join(REPO, 'games-auto', f), 'utf8'));
+    for (const v of Object.values(t.provenance || {})) for (const r of [].concat(v)) if (r.commit) cited.push(r.commit);
+  }
+  assert.ok(cited.length > 0, 'no table cites a commit — the check would be vacuous');
+  assert.deepEqual(cited.filter((c) => !Object.hasOwn(frozen, c)), []);
+  for (const [k, e] of Object.entries(frozen)) assert.ok(/^[0-9a-f]{40}$/.test(e.commit) && e.commit.startsWith(k) && e.date && e.subject, k);
+  const r = checkProvenance(JSON.parse(fs.readFileSync(path.join(REPO, 'games-auto/ptr.json'), 'utf8')), { labels, known: (c) => Object.hasOwn(frozen, c) });
+  assert.deepEqual(r.bad, []);
 });

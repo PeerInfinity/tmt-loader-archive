@@ -502,7 +502,8 @@ jobs:
   # ---------------------------------------------------------------------------------------------------------------
   # C1c Part 2 — BUYING THE WORD IDS IS A BEHAVIOUR CHANGE, measured before it ships: the seven games whose purchase
   # enumeration changed, each fresh (3600 game-s) and LIFTED (the reader's lift on the live state, 600 ticks), at HEAD
-  # twice and at the commit BEFORE C1c once (a control worktree — the checkout needs the history). A MEASUREMENT:
+  # twice, against the RECORDING of the commit before C1c (tools/harness/recorded/c1c-before.json; S1T, ⚖ R12/R13 —
+  # it used to run that commit in a control worktree and needed `fetch-depth: 0`). A MEASUREMENT:
   # its rows pass on "every leg ran, twice equal"; the table is the finding.
   # ---------------------------------------------------------------------------------------------------------------
   c1c-buy:
@@ -512,7 +513,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: actions/setup-node@v4
         with:

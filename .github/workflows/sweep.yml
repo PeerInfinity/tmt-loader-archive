@@ -69,6 +69,11 @@ jobs:
       - name: G6 + G7 — the roster doc and the declined list
         run: node tools/games-table.mjs --check
 
+      # S1T (⚖ R12/R13): G4's pristine rule reads games-pristine/<id>.json instead of the history. This step is the
+      # records alone — every game has one, none is orphaned, and each listing hashes to the upstream tree it names.
+      - name: Pristine records — every game has one, each hashes to the upstream tree it names (no git history)
+        run: node tools/pristine.mjs --check
+
       # ⚖ The media exception (user, 2026-09-22; docs/add-a-game.md): every in-scope image of every game is WebP and
       # every audio file is the silent stub. `git subtree pull` restores the ORIGINAL of every file upstream touched —
       # the game still works, so nothing else would notice the compression quietly disappearing. `node:` builtins only.
@@ -399,13 +404,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # ⛔ `fetch-depth: 0`, MEASURED in production on the job's very first run (35458073272): part 2's
-          # `check-manifest` row searches the whole HISTORY for each game's subtree-squash commit
-          # (`--grep=^git-subtree-dir: games/<id>$`, then the squash's tree against `HEAD:games/<id>`). On a depth-1
-          # checkout both come back `null` and the row goes RED for a reason that has nothing to do with the au tab:
-          # `{"field":"upstream.commit","subtreeSplit":null}` · `{"field":"games pristine","treeSquash":null}`, on
-          # both games. The `anchors` job pays the same price for the same kind of reason.
-          fetch-depth: 0
+          # Depth 1 (S1T, 2026-09-29). This was `fetch-depth: 0` because part 2's `check-manifest` row searched the
+          # history for each game's subtree-squash commit (measured RED on a depth-1 checkout, run 35458073272). It now
+          # reads the recorded upstream listing games-pristine/<id>.json against the files (tools/pristine.mjs) —
+          # ⚖ R12/R13: no gate may need the history, the old repository's or this one's.
+          fetch-depth: 1
 
       - uses: actions/setup-node@v4
         with:
@@ -1071,8 +1074,9 @@ jobs:
   # ---------------------------------------------------------------------------------------------------------------
   # C1 — THE CURRENCY READER as GENERATED data, and the per-game tables as JSON with a schema.
   # ⛔ `c1-data` REGENERATES THE WHOLE ROSTER (171 boots, --jobs 4) and fails on any committed `games-data/<id>.json` a
-  # regeneration would change — that is what "fresh by construction" means. It checks out the WHOLE HISTORY because
-  # the provenance gate asks `git merge-base --is-ancestor` of every record's commit. `--assert` on every part: each
+  # regeneration would change — that is what "fresh by construction" means. Depth 1: the provenance gate checks each
+  # record's commit against the FROZEN list tools/harness/recorded/provenance-commits.json, not against the history
+  # (S1T, ⚖ R12/R13 — it used to ask `git merge-base --is-ancestor`, and needed `fetch-depth: 0`). `--assert` on every part: each
   # declares the row count it emits, and a battery that stopped part-way prints fewer rows, which is fewer reds.
   # ---------------------------------------------------------------------------------------------------------------
   c1-data:
@@ -1083,7 +1087,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: actions/setup-node@v4
         with:
@@ -1228,8 +1232,9 @@ jobs:
           retention-days: 14
 
   # C1c part 3 — INERTNESS where every purchase id is numeric: ptr's opening (pinned 6862 / cf8df88462606277),
-  # all/M15 → M25 and Something Tree fresh → S05, at HEAD twice and at the commit BEFORE C1c once (a control worktree
-  # the gate makes and removes — so the checkout needs the history).
+  # all/M15 → M25 and Something Tree fresh → S05, at HEAD twice, against the RECORDING of the commit before C1c
+  # (tools/harness/recorded/c1c-before.json — S1T, ⚖ R12/R13: it used to run that commit in a control worktree, and
+  # needed `fetch-depth: 0`; see the gate's header for what that changes).
   c1c-inert:
     name: C1c inertness — headless (part 3)
     needs: fast
@@ -1238,7 +1243,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: actions/setup-node@v4
         with:
@@ -1831,9 +1836,9 @@ jobs:
   # ⚠ Its own job, in parallel with the matrix, NOT folded into `fast`: at ~3.3 min it is the second most expensive
   # thing here, and `fast` is worth having only because it finishes in seconds.
   #
-  # ⛔ `fetch-depth: 0`. Each pinned row re-runs the COMMIT that first recorded it in a throwaway `git worktree`
-  # (3bc12bf, 17260e03, 71da72e — all on main) and requires it to reproduce its tick and full hash. A depth-1
-  # checkout does not have those objects, and the job would fail for a reason that has nothing to do with the code.
+  # Depth 1 (S1T, 2026-09-29; ⚖ R12/R13). Each pinned row used to re-run the COMMIT that first recorded it in a
+  # throwaway `git worktree` (3bc12bf, 17260e03, 71da72e), which needed `fetch-depth: 0`. It now compares against a
+  # RECORDING of those runs, tools/harness/recorded/s1-baselines.json — see gates-s1.mjs for what that changes.
   # ---------------------------------------------------------------------------------------------------------------
   # ---- V5: the Advanced tab — the WRAP, NO JUMP, the RETRY conditions -----------------------------------------------
   v5-page:
@@ -2006,7 +2011,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: actions/setup-node@v4
         with:
