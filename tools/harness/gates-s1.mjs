@@ -4,10 +4,20 @@
 // PINNED BEHAVIOUR — the A1-3 / A2-3 / §12d / A2-1 runs under the derived tables restricted to kinds=reset,upgrades,buyables,
 // each mark at its SUMMARY tick with the game state equal. `hash` (the full stateJSON) includes player.au, whose
 // `clickables` has one key per au button, so it moves with the NUMBER of registered features; the rows therefore chain:
-// the commit that recorded a SUMMARY row (3bc12bf for A1-3, 17260e03 for A2) is checked out in a throwaway worktree with
-// only the `hashGame` patch (the same state without player.au), reproduces the SUMMARY tick and FULL hash, and hands its
-// hashGame to the S1 run, which must equal it at the same tick. Also: the fresh-boot Locked states old vs derived, the
-// predicate compiler vs the harness's --until (node and page), and the table-less generality probe (the-omega-tree).
+// the commit that recorded a SUMMARY row (3bc12bf for A1-3, 17260e03 for A2) reproduces the SUMMARY tick and FULL hash,
+// and hands its hashGame (the same state without player.au) to the S1 run, which must equal it at the same tick. Also:
+// the fresh-boot Locked states old vs derived, the predicate compiler vs the harness's --until (node and page), and the
+// table-less generality probe (the-omega-tree).
+// ⛔ THE BASELINE SIDE IS A RECORDING (S1T, 2026-09-29; ⚖ R12/R13 — the split imports a history-free tree and nothing in
+// it may need the old repository). Each baseline commit used to be checked out in a throwaway worktree (with only the
+// `hashGame` patch and the Node 21+ shim repair) and RE-RUN, which needed `fetch-depth: 0`. The rows now read
+// `tools/harness/recorded/s1-baselines.json`: what those runs produced — the fields the rows read — recorded once at S1T
+// from the worktree runs (twice, equal: the runs are deterministic) by the `--record` flag this file carried at
+// `fb45e525f` (record mode: that side only, no wall). ⚠ WHAT THAT CHANGES: a `baseline` row now proves the RECORDING still says what SUMMARY says (it can only
+// go red if the recording is edited), and a `pinned` row proves "HEAD equals what the baseline commit produced on the
+// day it was recorded" — not "on today's games, fixtures and Node". The two differ only if something the baseline run
+// read has moved since (a game's files, a marks definition below, the runtime); re-record from the archive
+// (`tmt-loader-archive`, the commit above) if that move was intended.
 // Part 1s: the §12d stall pair alone (two 9-min-walled detector runs need whole cores). The au tab page checks are
 // gates-a1 part 2, run separately (`node gates-a1.mjs --part 2 ptr something`).
 // Part 2 (S1-2): the S1 frontier (PTR, every derived kind on, fresh game) with the toggles' yield checks, an informative
@@ -16,7 +26,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 import { REPO, parseArgs, startServer, readManifest, headCommit, treeDirty, writeJSON, entryOnly, SOMETHING_OLD_TABLE, withPreF1, PRE_F1 } from './lib.mjs';
 import { runPage } from './page.mjs';
@@ -76,32 +86,28 @@ const PINS = [
 ];
 
 const a = parseArgs(process.argv.slice(2), ['no-summary']);
-// S1T (R12/R13) RECORDER, one-time: `--record <file>` writes what each baseline run produced (the fields the rows read)
-// into <file>, merged with what is already there, so the gate can later compare against the recording instead of
-// re-running the commit. Removed in the next commit; kept in the archive's history as the regenerator.
-const RECORD = a.record ? {} : null;
-const projectBase = (b) => ({ ok: b.ok, ...(b.error ? { error: b.error } : {}), ticks: b.ticks, gameSeconds: b.gameSeconds, hash: b.hash, hashGame: b.hashGame,
-  marks: b.marks ? Object.fromEntries(Object.entries(b.marks).map(([n, m]) => [n, m ? { ticks: m.ticks, gameSeconds: m.gameSeconds, hash: m.hash, hashGame: m.hashGame } : null])) : null,
-  stall: b.stall ? { stalled: b.stall.stalled, walled: b.stall.walled, lastProgress: b.stall.lastProgress ? { ticks: b.stall.lastProgress.ticks } : null } : null,
-  featureStates: b.featureStates ?? null });
+/** The baseline commits' recorded runs: {<pin key> | fresh:<id>: {ok, ticks, gameSeconds, hash, hashGame, marks, stall,
+ *  featureStates}}. A pin with no recording is a RED row (ok: false), never a skip. */
+const RECORDING = 'tools/harness/recorded/s1-baselines.json';
+const recorded = (() => { let r = null; return (key) => { r ??= JSON.parse(fs.readFileSync(path.join(REPO, RECORDING), 'utf8')).results; return Promise.resolve(r[key] ?? { ok: false, error: `no recording for ${key} in ${RECORDING}` }); }; })();
 const PART = String(a.part || '1');
 const commit = headCommit(), dirty = treeDirty();
 const date = new Date().toISOString().slice(0, 19) + 'Z';
 const rows = [];
 const row = (r) => { rows.push(r); console.log(`${r.ok ? 'GREEN' : 'RED  '} ${r.gate} ${r.id} ticks=${r.ticks ?? '-'} gs=${r.gameSeconds ?? '-'} diff=${r.diff ?? '-'} hash=${r.hash ?? '-'} ${String(r.notes || '').slice(0, 400)}`); };
 const HEADERS = {
-  1: 'Reading this section: pinned rows compare TICKS and the game state without player.au (`hashGame`); the full hash includes player.au.clickables (one key per au button), which moves with the number of registered features. Each baseline row re-runs the commit that recorded the SUMMARY row (throwaway worktree, `hashGame` patch only) and must reproduce its tick and FULL hash.',
+  1: 'Reading this section: pinned rows compare TICKS and the game state without player.au (`hashGame`); the full hash includes player.au.clickables (one key per au button), which moves with the number of registered features. Each baseline row reads the RECORDING of the commit that recorded the SUMMARY row (tools/harness/recorded/s1-baselines.json, recorded at S1T from a throwaway worktree with the `hashGame` patch only) and must reproduce its tick and FULL hash.',
 };
 
-// ---- a pool of run.mjs children (optionally from another checkout) --------------------------------------------------------
+// ---- a pool of run.mjs children --------------------------------------------------------------------------------------------
 const POOL = Number(a.pool || 6);
 let running = 0;
 const queue = [];
 function pump() {
   while (running < POOL && queue.length) {
     const { id, o: o0, root, resolve } = queue.shift();
-    // F1: a leg at HEAD names the pre-F1 configuration (no passive yield); a BASELINE tree predates the option
-    const o = root === REPO ? withPreF1(o0) : o0;
+    // F1: a leg at HEAD names the pre-F1 configuration (no passive yield)
+    const o = withPreF1(o0);
     running++;
     const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tmt-loader-s1-')), 'r.json');
     const args = [path.join(root, 'tools/harness/run.mjs'), id, '--json', out];
@@ -119,7 +125,7 @@ function pump() {
     });
   }
 }
-const job = (id, o, root = REPO) => new Promise((resolve) => { queue.push({ id, o, root, resolve }); pump(); });
+const job = (id, o) => new Promise((resolve) => { queue.push({ id, o, root: REPO, resolve }); pump(); });
 function marksFile(list) {
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tmt-loader-marks-')), 'marks.json');
   fs.writeFileSync(f, JSON.stringify(list));
@@ -128,37 +134,6 @@ function marksFile(list) {
 const fmtMark = (m) => (m ? `${m.ticks} ticks / ${m.gameSeconds} s / ${m.hash} (game ${m.hashGame})` : 'NOT MET');
 function detailBrief(r) {
   return Object.entries(r.detail || {}).map(([l, o]) => `${l}{${o.unlocked ? '' : 'LOCKED '}pts ${o.points}${o.best ? ' best ' + o.best : ''}; upg [${o.upgrades}]; ms [${o.milestones}]${Object.keys(o.buyables || {}).length ? '; buy ' + JSON.stringify(o.buyables) : ''}; canReset ${o.canReset}${o.canReset ? ' gain ' + o.resetGain : ''}${o.nextAt ? ' nextAt ' + o.nextAt : ''}${o.nextUpgrades?.length ? '; next upg ' + o.nextUpgrades.join(' ') : ''}${o.nextMilestones?.length ? '; next ms ' + o.nextMilestones.join(' | ') : ''}}`).join(' ');
-}
-
-// A throwaway worktree at `sha` whose boot.mjs also reports `hashGame` (marks and the final state) — nothing else changes.
-const worktrees = [];
-function baselineTree(sha) {
-  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tmt-loader-baseline-')), sha);
-  execFileSync('git', ['-C', REPO, 'worktree', 'add', '--detach', dir, sha], { stdio: 'ignore' });
-  worktrees.push(dir);
-  const p = path.join(dir, 'tools/harness/boot.mjs');
-  let s = fs.readFileSync(p, 'utf8');
-  const m1 = '    for (const [n] of MARKS) R.marks[n] = m.hits[n] ? { ticks: m.hits[n].ticks, gameSeconds: m.hits[n].gameSeconds, hash: sha256hex(m.hits[n].json).slice(0, 16) } : null;';
-  const m2 = '  R.hook = run(';
-  if (!s.includes(m1) || !s.includes(m2)) throw new Error(`baseline ${sha}: boot.mjs does not have the expected marks / hook lines`);
-  s = s.replace(m1, "    const exAu = (j) => { const o = JSON.parse(j); delete o.au; return JSON.stringify(o); };\n    for (const [n] of MARKS) R.marks[n] = m.hits[n] ? { ticks: m.hits[n].ticks, gameSeconds: m.hits[n].gameSeconds, hash: sha256hex(m.hits[n].json).slice(0, 16), hashGame: sha256hex(exAu(m.hits[n].json)).slice(0, 16) } : null;");
-  s = s.replace(m2, "  R.hashGame = await run(`tmtLoader.hash({ exclude: ['au'] })`, 'hash');\n  R.featureStates = run('(tmtLoader.features || []).map(f => { const s = tmtLoader.featureState(f.id); return [f.id, s.unlocked, s.policy]; })', 'x');\n" + m2);
-  // A historical tree cannot boot on modern Node: its boot.mjs installs the shims with
-  // `Object.assign(globalThis, shims)`, and Node 21+ defines `navigator` (and `crypto`, `performance`) as
-  // GETTER-ONLY accessors, so the assign throws and the BASELINE leg of every pin reads `undefined`. Measured:
-  // 34 of 52 rows red on that alone, with the current tree reproducing the recorded game states all along. The
-  // same one-line repair as the live boot.mjs (see its comment there), applied to whatever old tree we check out
-  // — a baseline is only useful if it still runs.
-  const ASSIGN = 'Object.assign(globalThis, shims);';
-  if (s.includes(ASSIGN)) {
-    s = s.replace(ASSIGN, 'for (const [k, v] of Object.entries(shims)) { try { globalThis[k] = v; } catch { Object.defineProperty(globalThis, k, { value: v, writable: true, enumerable: true, configurable: true }); } }');
-  }
-  fs.writeFileSync(p, s);
-  return dir;
-}
-function removeTrees() {
-  for (const d of worktrees) { try { execFileSync('git', ['-C', REPO, 'worktree', 'remove', '--force', d], { stdio: 'ignore' }); } catch {} }
-  try { execFileSync('git', ['-C', REPO, 'worktree', 'prune'], { stdio: 'ignore' }); } catch {}
 }
 
 async function offAnchors(tag, id) {
@@ -183,38 +158,23 @@ async function offAnchors(tag, id) {
 
 // ---- Part 1 ----------------------------------------------------------------------------------------------------------
 // part 1s: only the §12d stall pair (baseline + S1), so the two 9-min-walled detector runs get whole cores
-const noWall = (o) => { const { 'wall-ms': _w, ...rest } = o; return rest; };
-// RECORD MODE: the baseline side only, and with NO wall — a wall only ever cuts a run short, and a run cut by machine
-// load is not a recording of what the baseline produces
-async function recordBaselines(pins, fresh) {
-  const trees = {};
-  for (const sha of [...new Set(pins.map((p) => p.baseline).concat(fresh ? ['17260e03'] : []))]) trees[sha] = baselineTree(sha);
-  const jobs = pins.map((p) => job(p.id, noWall({ profile: 'all', ...p.o, marks: marksFile(MARKS[p.marks]) }), trees[p.baseline]).then((b) => { RECORD[p.key] = projectBase(b); }));
-  if (fresh) for (const id of ['ptr', 'something']) jobs.push(job(id, { ticks: 0, diff: 1 }, trees['17260e03']).then((o) => { RECORD[`fresh:${id}`] = projectBase(o); }));
-  await Promise.all(jobs);
-}
 async function part1s() {
   const pins = PINS.filter((p) => p.stall);
-  if (RECORD) return recordBaselines(pins, false);
-  const tree = baselineTree(pins[0].baseline);
   await pinnedRows(pins.map((p) => {
     const o = { profile: 'all', ...p.o, marks: marksFile(MARKS[p.marks]) };
-    return { p, s1: job(p.id, { ...o, 'auto-opt': p.pinOpt || KINDS_PINNED }), base: job(p.id, o, tree) };
+    return { p, s1: job(p.id, { ...o, 'auto-opt': p.pinOpt || KINDS_PINNED }), base: recorded(p.key) };
   }));
 }
 async function part1(browser, base) {
-  if (RECORD) return recordBaselines(PINS.filter((p) => !p.stall), true);
-  const trees = {};
   const pins = PINS.filter((p) => !p.stall);
-  for (const sha of [...new Set(pins.map((p) => p.baseline).concat(['17260e03']))]) trees[sha] = baselineTree(sha);
   const runs = pins.map((p) => {
     const mf = marksFile(MARKS[p.marks]);
     const o = { profile: 'all', ...p.o, marks: mf };
-    return { p, s1: job(p.id, { ...o, 'auto-opt': p.pinOpt || KINDS_PINNED }), base: job(p.id, o, trees[p.baseline]) };
+    return { p, s1: job(p.id, { ...o, 'auto-opt': p.pinOpt || KINDS_PINNED }), base: recorded(p.key) };
   });
   // R3c Part 0: the fresh-boot row compares each feature's policy with the 17260e03 TABLE's — a baseline comparison, so
   // Something Tree's side names the deleted table (CI run 35565198991 at `c5df909dc` found this row, not the brief)
-  const fresh = ['ptr', 'something'].map((id) => ({ id, s1: job(id, { ticks: 0, diff: 1, ...(id === 'something' ? { 'auto-opt': SOMETHING_OLD_TABLE } : {}) }), old: job(id, { ticks: 0, diff: 1 }, trees['17260e03']) }));
+  const fresh = ['ptr', 'something'].map((id) => ({ id, s1: job(id, { ticks: 0, diff: 1, ...(id === 'something' ? { 'auto-opt': SOMETHING_OLD_TABLE } : {}) }), old: recorded(`fresh:${id}`) }));
   const omega = job('the-omega-tree', { profile: 'all', diff: 1, ticks: 3000, stall: 3600, 'stall-seen': true, 'wall-ms': 540000 });
   await offAnchors('S1-1', 'ptr');
   await offAnchors('S1-1', 'something');
@@ -224,14 +184,13 @@ async function part1(browser, base) {
 async function pinnedRows(runs) {
   for (const { p, s1, base: bp } of runs) {
     const [r, b] = await Promise.all([s1, bp]);
-    if (RECORD) RECORD[p.key] = projectBase(b);
     if (p.want) {
       MARKS[p.marks].forEach(([n], i) => {
         const [wt, wh] = p.want[i];
         const x = r.marks?.[n], y = b.marks?.[n];
         const baseOk = !!b.ok && y && y.ticks === wt && y.hash === wh;
         row({ gate: `S1-1 baseline ${p.tag} ${n} @ ${p.baseline}`, id: p.id, leg: 'profile all', ok: !!baseOk, ticks: y?.ticks, gameSeconds: y?.gameSeconds, diff: p.o.diff, hash: y?.hash,
-          notes: `SUMMARY ${wt} ticks / ${wh}; baseline ${fmtMark(y)}${b.error ? '; ' + b.error : ''}` });
+          notes: `SUMMARY ${wt} ticks / ${wh}; baseline (recorded) ${fmtMark(y)}${b.error ? '; ' + b.error : ''}` });
         const ok = baseOk && !!r.ok && x && x.ticks === wt && x.hashGame === y.hashGame;
         row({ gate: `S1-1 pinned ${p.tag} ${n} (${p.pinOpt || KINDS_PINNED})`, id: p.id, leg: 'profile all', ok: !!ok, ticks: x?.ticks, gameSeconds: x?.gameSeconds, diff: p.o.diff, hash: x?.hash,
           notes: `game state ${x?.hashGame} vs baseline ${y?.hashGame} — equal ${x?.hashGame === y?.hashGame}; ticks ${x?.ticks} vs SUMMARY ${wt}; features ${r.features?.length}; actions ${JSON.stringify(r.hook?.actions)}${r.error ? '; ' + r.error : ''}` });
@@ -240,7 +199,7 @@ async function pinnedRows(runs) {
       const w = p.stall;
       const baseOk = !!b.ok && b.ticks === w.ticks && b.hash === w.hash && b.stall?.lastProgress?.ticks === w.lastProgress && b.stall?.stalled && !b.stall?.walled;
       row({ gate: `S1-1 baseline ${p.tag} @ ${p.baseline}`, id: p.id, leg: 'profile all', ok: baseOk, ticks: b.ticks, gameSeconds: b.gameSeconds, diff: 1, hash: b.hash,
-        notes: `SUMMARY stalled ${w.ticks} / ${w.hash} / last progress ${w.lastProgress}; baseline stalled ${b.stall?.stalled} walled ${b.stall?.walled} last progress ${b.stall?.lastProgress?.ticks}; game ${b.hashGame}${b.error ? '; ' + b.error : ''}` });
+        notes: `SUMMARY stalled ${w.ticks} / ${w.hash} / last progress ${w.lastProgress}; baseline (recorded) stalled ${b.stall?.stalled} walled ${b.stall?.walled} last progress ${b.stall?.lastProgress?.ticks}; game ${b.hashGame}${b.error ? '; ' + b.error : ''}` });
       const ok = baseOk && !!r.ok && r.ticks === w.ticks && r.hashGame === b.hashGame && r.stall?.lastProgress?.ticks === w.lastProgress && r.stall?.stalled && !r.stall?.walled;
       row({ gate: `S1-1 pinned ${p.tag} (${p.pinOpt || KINDS_PINNED})`, id: p.id, leg: 'profile all', ok, ticks: r.ticks, gameSeconds: r.gameSeconds, diff: 1, hash: r.hash,
         notes: `stalled ${r.stall?.stalled} walled ${r.stall?.walled}; last progress ${r.stall?.lastProgress?.ticks}; game state ${r.hashGame} vs baseline ${b.hashGame} — equal ${r.hashGame === b.hashGame}; marks ${Object.entries(r.marks || {}).map(([n, m]) => `${n}: ${m?.ticks}/${m?.hashGame}`).join(' · ')}; actions ${JSON.stringify(r.hook?.actions)}; state: ${detailBrief(r)}` });
@@ -266,7 +225,6 @@ async function part1rest(browser, base, fresh, omega) {
   // fresh boot: each old feature's Locked state (unlocked()) vs the derived feature of the same id; the new ids listed
   for (const { id, s1, old } of fresh) {
     const [r, o] = await Promise.all([s1, old]);
-    if (RECORD) RECORD[`fresh:${id}`] = projectBase(o);
     const now = Object.fromEntries((r.featureStates || []).map(([fid, u, pol]) => [fid, [u, pol]]));
     const diffs = [], same = [], intended = [];
     for (const [fid, u, pol] of o.featureStates || []) {
@@ -473,12 +431,6 @@ try {
 } finally {
   await browser.close();
   server.stop();
-  removeTrees();
-  if (RECORD) {
-    const prev = fs.existsSync(a.record) ? JSON.parse(fs.readFileSync(a.record, 'utf8')) : {};
-    fs.writeFileSync(a.record, JSON.stringify({ ...prev, ...RECORD }, null, 1) + '\n');
-    console.log(`recorded ${Object.keys(RECORD).length} baseline result(s) → ${a.record}`);
-  }
 }
 
 const SUMMARY = path.join(REPO, 'tools/harness/results/SUMMARY.md');

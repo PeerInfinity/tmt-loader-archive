@@ -410,6 +410,10 @@ a word-id entry on a game outside that list is named as outside every claim, nev
 `--provenance` (the provenance GATE — every entry has a record, every commit is an ancestor of HEAD, every gate is a
 SUMMARY row or a named CI run). docs/automation.md, "The data table".
 
+> **S1T (2026-09-29, ⚖ R12/R13):** "every commit is an ancestor of HEAD" is now "every commit is in the FROZEN list
+> `tools/harness/recorded/provenance-commits.json`" — the gate reads no git. A new record's commit is added with
+> `node tools/auto-tables.mjs --add-commit <sha>`. See "No gate reads git history" at the end of this file.
+
 ## What runs where
 
 ⚖ Until U2g (2026-09-18) CI held exactly one gate — the M1 mobile sweep — and every other check ran on one box, in
@@ -448,6 +452,9 @@ rather than an extrapolation.
 ⛔ **Everything in `sweep.yml` past the fast job is gated on it.** Three seconds of unit tests decide whether
 thirteen runners start. `loader/workflows.test.mjs` asserts the `needs:`, because the way that gets undone is a
 convenience edit by someone whose change "does not touch the units".
+
+> **S1T (2026-09-29):** the `c1-data` row's "(full history)" no longer holds — every job checks out at depth 1 now, and
+> `workflows.test.mjs` refuses a `fetch-depth: 0`. The fast job also runs `node tools/pristine.mjs --check` (< 1 s).
 
 ### The PLAYER view has its own row, and the vacuity question belongs to the RUN (U16)
 
@@ -499,6 +506,8 @@ the compression quietly disappearing. Two gates do:
 - **`check-manifest`'s `games pristine`** now admits a difference from the subtree squash made only of in-place
   modifications of processed media files — so a restored original is `games pristine (media)` RED there too, and a
   changed byte of code, markup or a licence is still plain `games pristine`.
+
+  > **S1T (2026-09-29):** "the subtree squash" is now its RECORDING, `games-pristine/<id>.json` — the rule is unchanged.
 
 The fix for a red is `node tools/media.mjs --write <id>` (Pillow in `.venv`), committed on its own. Mutants:
 `tools/harness/mutants-assets1.sh` (7 of 7 killed; add-a-game.md lists them).
@@ -726,3 +735,45 @@ than letting them pass silently.
 > link to the census, which is where the games are listed. G5's three picker steps are replaced by three home-page
 > steps (ready with no error; fetches nothing but `index.html` and `loader/` modules; links the census), so the
 > paragraph above no longer describes a whole-roster check. The roster is held by G6 and the sweep.
+
+## No gate reads git history (S1T, 2026-09-29)
+
+⚖ **R12 (user, 2026-09-29):** the repository split starts from two EMPTY repositories and imports only today's tree —
+no history — and *"redesign the tests to work with the new system"*. **R13 (user, same day):** *"I don't want the new
+repo to have anything that requires the old repo to still exist."* So no gate may resolve, fetch, check out or
+ancestor-check a commit of the old history, in CI or locally; a historical sha may appear in a record as TEXT (where
+it came from), never as something that must resolve.
+
+S0 measured four gate families that did (tmt-repo-split-plan, "S0 — as measured", P1). Each now reads a committed
+record, generated ONCE at S1T from the history while it existed:
+
+| gate | read from history before | reads now | regenerate |
+|---|---|---|---|
+| G4 `check-manifest` `games pristine` (and `add-game`, `gates.mjs`, `gates-a1`, `gates-s1`, `gates-l2b`, `triage`) | each game's `git-subtree` squash commit (`log --grep`), its tree against `HEAD:games/<id>`, `status -- games/<id>` | `games-pristine/<id>.json` — the upstream commit, the upstream tree id, and every file's git blob id — against the FILES (`tools/pristine.mjs` hashes them as git does, `node:` builtins only); the working-tree check is `git -C games status -- <id>`, which reads the same whether games/ is a directory or a submodule | a new game: `add-game.mjs` writes it (`pristine.mjs --write <id>`) after the import, before media; a re-pin: `pristine.mjs --write <id> --from <upstream checkout>` |
+| `auto-tables --provenance` (C1-3) | `git merge-base --is-ancestor <record's commit> HEAD` | the frozen list `tools/harness/recorded/provenance-commits.json` (sha, date, subject) | a new cited commit: `auto-tables.mjs --add-commit <sha>` (the one place it asks git, about THIS repository) |
+| `gates-c1c` parts 2, 3 (`c1c-buy`, `c1c-inert`; `mutants-c1c.sh` m3) | a control worktree at `4d8ee5a69` | `tools/harness/recorded/c1c-before.json` | from the archive, at the recorder commit it names |
+| `gates-s1` part 1, 1s (`anchors`) | throwaway worktrees at `3bc12bf`, `17260e03`, `71da72e` | `tools/harness/recorded/s1-baselines.json` | from the archive, at the recorder commit it names |
+| `mutants-assets1.sh` M1, M2 | `git show <squash>:<file>` for an original | an UNPROCESSED stand-in (the image re-saved in its own format at its own size; audio that is not the stub) — the mutants need a raw file, not upstream's exact bytes; a new M6 edits a record | — |
+
+Each record names what it was generated from and by what (`recorded.from` / `recorded.by`). The recorders
+(`tools/harness/record-history.mjs`, and the `--record` flags of `gates-c1c` / `gates-s1`) were committed, run, and then
+deleted in the same slice: the archive keeps them at the commit each record names, and the imported tree does not
+carry code that needs the old history.
+
+⚠ **Two of these change what the gate PROVES**, and say so in their own headers:
+
+- **`gates-c1c` and `gates-s1` compare HEAD against a RECORDING of the old commit's run**, not against the old code run
+  today. Before recording, every recorded run was made TWICE and the two recordings compared equal (the runs are
+  deterministic). The rows go red on the same code defects as before; what they no longer notice is a move in
+  something the OLD run read — a game's files, a ladder or snapshot fixture, HEAD's `games-data/` (c1c part 2's lift
+  script prepends it on both sides), the runtime. A `baseline` row of gates-s1 now checks the recording against
+  SUMMARY, so it reds only if the recording is edited.
+- **G4 compares the working tree's FILES with the record**, where it compared the committed tree with the squash and
+  then asked `git status` about the rest. The two are equivalent on a clean checkout — measured at S1T on all 175
+  games: the same verdict, the same 1,732 processed media files, and the same tree id per game (`listDisk` hashes to
+  `HEAD:games/<id>` on every one). A record is self-authenticating: its listing must hash to the tree id it names, so a
+  hand edit of one blob id reds `games pristine (record)`.
+
+`workflows.test.mjs` refuses a `fetch-depth: 0` in any workflow: one coming back is the first sign a gate reaches for
+history again.
+
