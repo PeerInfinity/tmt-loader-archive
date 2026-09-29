@@ -15,7 +15,12 @@ git -C "$REPO" worktree add --detach -q "$WT" HEAD
 ln -s "$REPO/node_modules" "$WT/node_modules"
 export TMT_PYTHON="${TMT_PYTHON:-$REPO/.venv/bin/python3}"
 cd "$WT"
-git config user.name "assets1 mutants"; git config user.email "mutants@localhost"
+# ⛔ AN IDENTITY FOR THIS SCRIPT'S THROWAWAY COMMITS ONLY — as environment variables, never `git config`. A plain
+# `git config user.name` inside a WORKTREE writes the SHARED repository config: from 2026-09-22 it made every commit
+# in every worktree of this clone "assets1 mutants <mutants@localhost>" — 70 of them on the public main (found and
+# restored 2026-09-29). The variables die with this process and touch no config file.
+export GIT_AUTHOR_NAME="assets1 mutants" GIT_AUTHOR_EMAIL="mutants@localhost"
+export GIT_COMMITTER_NAME="assets1 mutants" GIT_COMMITTER_EMAIL="mutants@localhost"
 pass=0; fail=0
 verdict() { if [ "$2" = red ]; then echo "KILLED  $1"; pass=$((pass+1)); else echo "SURVIVED $1 — $3"; fail=$((fail+1)); fi; }
 original() { # <id> <rel> → an UNPROCESSED stand-in for upstream's original: an image re-saved in its own extension's
