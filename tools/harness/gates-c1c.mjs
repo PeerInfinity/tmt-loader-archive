@@ -170,8 +170,18 @@ function liftScript(id) {
   fs.writeFileSync(out, `var LIFT_DATA = ${data.trim()};\n` + fs.readFileSync(path.join(REPO, 'tools/harness/lift-word.js'), 'utf8'));
   return out;
 }
+const noWall = (f) => { const { 'wall-ms': _w, ...rest } = f; return rest; };
 async function part2() {
   const root = beforeRoot();
+  if (RECORD) {
+    // RECORD MODE: the BEFORE side only, and with NO wall — a wall only ever cuts a run short, and a run cut by machine
+    // load is not a recording of what BEFORE produces (measured: the M15 → M25 leg cut at 572 s under a load of 11+)
+    const fl = (id, kind) => noWall(kind === 'fresh' ? P2FLAGS : { ...P2FLAGS, ticks: LIFT_TICKS, planner: true, 'planner-script': liftScript(id) });
+    const legs = ['fresh', 'lifted'].flatMap((kind) => P2.map((id) => ({ id, kind })));
+    const out = await pool(legs, POOL, async (j) => ({ ...j, r: await runAt(root, j.id, fl(j.id, j.kind)) }));
+    for (const x of out) RECORD[`part2:${x.kind}:${x.id}`] = projectBefore(x.r);
+    return;
+  }
   const jobs = [];
   const flagsOf = (id, kind) => (kind === 'fresh' ? P2FLAGS : { ...P2FLAGS, ticks: LIFT_TICKS, planner: true, 'planner-script': liftScript(id) });
   for (const kind of ['fresh', 'lifted']) for (const id of P2) { for (let k = 0; k < REPEAT; k++) jobs.push({ id, kind, side: 'after', k }); jobs.push({ id, kind, side: 'before', k: 0 }); }
@@ -205,6 +215,11 @@ const LEGS = [
 // M25 — so this part runs at most THREE children at once (one per leg), whatever --pool says.
 async function part3() {
   const root = beforeRoot();
+  if (RECORD) {  // RECORD MODE: as part 2 — the BEFORE side only, no wall
+    const out = await pool(LEGS, Math.min(POOL, 3), async (L) => ({ L, r: await runAt(root, L.id, noWall(L.flags)) }));
+    for (const x of out) RECORD[`part3:${x.L.key}`] = projectBefore(x.r);
+    return;
+  }
   const jobs = [];
   for (const L of LEGS) { for (let k = 0; k < REPEAT; k++) jobs.push({ L, side: 'after', k }); jobs.push({ L, side: 'before', k: 0 }); }
   const out = await pool(jobs, Math.min(POOL, 3), async (j) => ({ ...j, r: await runAt(j.side === 'after' ? REPO : root, j.L.id, j.L.flags) }));

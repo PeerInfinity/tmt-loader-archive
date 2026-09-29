@@ -183,8 +183,19 @@ async function offAnchors(tag, id) {
 
 // ---- Part 1 ----------------------------------------------------------------------------------------------------------
 // part 1s: only the §12d stall pair (baseline + S1), so the two 9-min-walled detector runs get whole cores
+const noWall = (o) => { const { 'wall-ms': _w, ...rest } = o; return rest; };
+// RECORD MODE: the baseline side only, and with NO wall — a wall only ever cuts a run short, and a run cut by machine
+// load is not a recording of what the baseline produces
+async function recordBaselines(pins, fresh) {
+  const trees = {};
+  for (const sha of [...new Set(pins.map((p) => p.baseline).concat(fresh ? ['17260e03'] : []))]) trees[sha] = baselineTree(sha);
+  const jobs = pins.map((p) => job(p.id, noWall({ profile: 'all', ...p.o, marks: marksFile(MARKS[p.marks]) }), trees[p.baseline]).then((b) => { RECORD[p.key] = projectBase(b); }));
+  if (fresh) for (const id of ['ptr', 'something']) jobs.push(job(id, { ticks: 0, diff: 1 }, trees['17260e03']).then((o) => { RECORD[`fresh:${id}`] = projectBase(o); }));
+  await Promise.all(jobs);
+}
 async function part1s() {
   const pins = PINS.filter((p) => p.stall);
+  if (RECORD) return recordBaselines(pins, false);
   const tree = baselineTree(pins[0].baseline);
   await pinnedRows(pins.map((p) => {
     const o = { profile: 'all', ...p.o, marks: marksFile(MARKS[p.marks]) };
@@ -192,6 +203,7 @@ async function part1s() {
   }));
 }
 async function part1(browser, base) {
+  if (RECORD) return recordBaselines(PINS.filter((p) => !p.stall), true);
   const trees = {};
   const pins = PINS.filter((p) => !p.stall);
   for (const sha of [...new Set(pins.map((p) => p.baseline).concat(['17260e03']))]) trees[sha] = baselineTree(sha);
